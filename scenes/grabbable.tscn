@@ -1,0 +1,26 @@
+[gd_scene format=3 uid="uid://2lfjly5ik86t"]
+
+[ext_resource type="Script" uid="uid://vpp3xfhb03ek" path="res://scripts/grabbable.gd" id="1_grab"]
+
+[sub_resource type="SphereMesh" id="SphereMesh_orb"]
+radius = 0.3
+height = 0.6
+radial_segments = 32
+rings = 16
+
+[sub_resource type="SphereShape3D" id="SphereShape3D_orb"]
+radius = 0.3
+
+[node name="Grabbable" type="RigidBody3D" unique_id=1066792771]
+collision_layer = 2
+collision_mask = 2
+gravity_scale = 0.0
+linear_damp = 2.5
+angular_damp = 3.0
+script = ExtResource("1_grab")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="." unique_id=1376661895]
+mesh = SubResource("SphereMesh_orb")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="." unique_id=1236714556]
+shape = SubResource("SphereShape3D_orb")

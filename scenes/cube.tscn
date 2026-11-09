@@ -1,0 +1,19 @@
+[gd_scene format=3 uid="uid://bkpwg5ci7xntt"]
+
+[ext_resource type="Script" uid="uid://vpp3xfhb03ek" path="res://scripts/grabbable.gd" id="1_7ufek"]
+
+[sub_resource type="BoxMesh" id="BoxMesh_0duit"]
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_0vtqy"]
+
+[node name="Cube" type="RigidBody3D" unique_id=1563443546]
+gravity_scale = 0.0
+script = ExtResource("1_7ufek")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="." unique_id=1084428268]
+transform = Transform3D(0.5, 0, 0, 0, 0.5, 0, 0, 0, 0.5, 0, 0, 0)
+mesh = SubResource("BoxMesh_0duit")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="." unique_id=1033038594]
+transform = Transform3D(0.5, 0, 0, 0, 0.5, 0, 0, 0, 0.5, 0, 0, 0)
+shape = SubResource("BoxShape3D_0vtqy")

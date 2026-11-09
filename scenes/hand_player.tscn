@@ -1,0 +1,41 @@
+[gd_scene format=3 uid="uid://dl3ibcsovqmco"]
+
+[ext_resource type="Script" uid="uid://bip6nyk8ulkbx" path="res://scripts/hand_controller.gd" id="1_hand"]
+[ext_resource type="PackedScene" uid="uid://dakc45e1lqc0o" path="res://assets/hand-game.glb" id="2_model"]
+[ext_resource type="Script" uid="uid://bgus2xxbplkra" path="res://scripts/arm_jelly.gd" id="3_jelly"]
+
+[sub_resource type="SphereShape3D" id="SphereShape3D_grab"]
+radius = 0.95
+
+[node name="HandPlayer" type="Node3D" unique_id=1753049861]
+script = ExtResource("1_hand")
+
+[node name="PalmPivot" type="Node3D" parent="." unique_id=1510662433]
+
+[node name="Model" parent="PalmPivot" unique_id=1763835175 instance=ExtResource("2_model")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -1, 0)
+
+[node name="HoldPoint" type="Marker3D" parent="PalmPivot" unique_id=718151841]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.61, 0.37)
+
+[node name="ArmEnd" type="Marker3D" parent="PalmPivot" unique_id=2117216834]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -5.6117535, 0)
+
+[node name="ArmJelly" type="Node3D" parent="PalmPivot" unique_id=853724990]
+script = ExtResource("3_jelly")
+damping = 16.0
+inertia_gain = 1.0
+max_accel = 100.0
+bend_amount = 2.0
+squash_amount = 1.0
+roughness_value = 1.0
+
+[node name="GrabArea" type="Area3D" parent="PalmPivot" unique_id=1789457499]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.2, 0.4)
+collision_layer = 0
+collision_mask = 2
+monitoring = false
+monitorable = false
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="PalmPivot/GrabArea" unique_id=1715229468]
+shape = SubResource("SphereShape3D_grab")

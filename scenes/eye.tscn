@@ -1,0 +1,16 @@
+[gd_scene format=3 uid="uid://vrscex37hyf6"]
+
+[ext_resource type="Script" uid="uid://vpp3xfhb03ek" path="res://scripts/grabbable.gd" id="1_60o0r"]
+[ext_resource type="PackedScene" uid="uid://dnyrsytug6nv2" path="res://assets/oleos.glb" id="1_xbsf0"]
+
+[sub_resource type="SphereShape3D" id="SphereShape3D_0duit"]
+radius = 0.4492835
+
+[node name="Eye" type="RigidBody3D" unique_id=1334147609]
+script = ExtResource("1_60o0r")
+
+[node name="Modelo" parent="." unique_id=1474755029 instance=ExtResource("1_xbsf0")]
+transform = Transform3D(0.25, 0, 0, 0, 0.25, 0, 0, 0, 0.25, 0, 0, 0)
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="." unique_id=1798942304]
+shape = SubResource("SphereShape3D_0duit")
