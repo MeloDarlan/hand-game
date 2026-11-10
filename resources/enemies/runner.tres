@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="EnemyData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/data/enemy_data.gd" id="1_data"]
+
+[resource]
+script = ExtResource("1_data")
+display_name = "Corredor"
+max_health = 30.0
+speed = 3.0
+base_damage = 1
+reward = 6
+color = Color(0.95, 0.35, 0.35, 1)
+radius = 0.32
+height = 0.85

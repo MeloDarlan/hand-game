@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="TowerData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/data/tower_data.gd" id="1_data"]
+
+[resource]
+script = ExtResource("1_data")
+display_name = "Rápida"
+cost = 20
+description = "Cadência alta e alcance curto. Derrete enxames."
+color = Color(0.35, 0.85, 0.95, 1)
+damage = 6.0
+attack_range = 3.2
+fire_interval = 0.28
+projectile_speed = 18.0
+slow_factor = 0.0
+slow_duration = 0.0

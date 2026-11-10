@@ -14,6 +14,12 @@ uniform float arm_length = 5.1;
 uniform vec4 albedo_color : source_color = vec4(0.8, 0.061, 0.036, 1.0);
 uniform float roughness_value = 0.45;
 
+// Fade do fim do antebraço, para o braço desaparecer no canto da tela.
+uniform float forearm_fade_start = 0.72;
+uniform float forearm_fade_strength = 1.0;
+
+varying float arm_t;
+
 const int SEGMENTS = 6;
 
 
@@ -33,6 +39,7 @@ vec3 chain_offset(float t) {
 
 void vertex() {
 	float t = arm_parameter(VERTEX);
+	arm_t = t;
 	float taper = smoothstep(0.0, 0.09, t) * (1.0 - smoothstep(0.92, 1.0, t));
 	float mask = taper;
 
@@ -56,4 +63,8 @@ void fragment() {
 	ALBEDO = albedo_color.rgb;
 	ROUGHNESS = roughness_value;
 	METALLIC = 0.0;
+
+	// Só o antebraço some, e só no fim (perto do corte que sairia na tela).
+	float fade = smoothstep(forearm_fade_start, 1.0, arm_t) * forearm_fade_strength;
+	ALPHA = clamp(1.0 - fade, 0.0, 1.0);
 }

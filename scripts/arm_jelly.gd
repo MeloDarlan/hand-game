@@ -22,6 +22,19 @@ const JELLY_SHADER := preload("res://resources/jelly_arm.gdshader")
 @export var albedo_color := Color(0.8, 0.061, 0.036, 1.0)
 @export var roughness_value := 0.45
 
+@export_group("Forearm Fade")
+## O antebraço começa a desaparecer a partir deste ponto (0 = punho, 1 = corte).
+@export_range(0.0, 1.0, 0.01) var forearm_fade_start := 0.72:
+	set(value):
+		forearm_fade_start = value
+		if _material != null:
+			_material.set_shader_parameter("forearm_fade_start", value)
+@export_range(0.0, 1.0, 0.01) var forearm_fade_strength := 1.0:
+	set(value):
+		forearm_fade_strength = value
+		if _material != null:
+			_material.set_shader_parameter("forearm_fade_strength", value)
+
 var _mesh: MeshInstance3D
 var _material: ShaderMaterial
 
@@ -63,6 +76,8 @@ func _ready() -> void:
 	_material.set_shader_parameter("stretch", 0.0)
 	_material.set_shader_parameter("albedo_color", albedo_color)
 	_material.set_shader_parameter("roughness_value", roughness_value)
+	_material.set_shader_parameter("forearm_fade_start", forearm_fade_start)
+	_material.set_shader_parameter("forearm_fade_strength", forearm_fade_strength)
 
 	_offsets.resize(SEGMENTS)
 	_velocities.resize(SEGMENTS)

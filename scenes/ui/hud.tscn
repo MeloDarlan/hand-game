@@ -1,0 +1,129 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/ui/hud.gd" id="1_hud"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_panel"]
+content_margin_left = 36.0
+content_margin_top = 28.0
+content_margin_right = 36.0
+content_margin_bottom = 28.0
+bg_color = Color(0.047, 0.067, 0.098, 0.97)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.35, 0.6, 0.9, 1)
+corner_radius_top_left = 14
+corner_radius_top_right = 14
+corner_radius_bottom_right = 14
+corner_radius_bottom_left = 14
+
+[node name="HUD" type="CanvasLayer"]
+script = ExtResource("1_hud")
+
+[node name="Root" type="Control" parent="."]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="Margin" type="MarginContainer" parent="Root"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+theme_override_constants/margin_left = 24
+theme_override_constants/margin_top = 16
+theme_override_constants/margin_right = 24
+theme_override_constants/margin_bottom = 16
+
+[node name="Layout" type="VBoxContainer" parent="Root/Margin"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_constants/separation = 12
+
+[node name="TopBar" type="HBoxContainer" parent="Root/Margin/Layout"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_constants/separation = 22
+
+[node name="CreditsLabel" type="Label" parent="Root/Margin/Layout/TopBar"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 20
+text = "Créditos: 100"
+
+[node name="LivesLabel" type="Label" parent="Root/Margin/Layout/TopBar"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 20
+text = "Vidas: 10"
+
+[node name="WaveLabel" type="Label" parent="Root/Margin/Layout/TopBar"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 20
+text = "Onda: —/3"
+
+[node name="TopSpacer" type="Control" parent="Root/Margin/Layout/TopBar"]
+layout_mode = 2
+size_flags_horizontal = 3
+mouse_filter = 2
+
+[node name="StartButton" type="Button" parent="Root/Margin/Layout/TopBar"]
+custom_minimum_size = Vector2(220, 48)
+layout_mode = 2
+focus_mode = 0
+text = "Iniciar onda  [Espaço]"
+
+[node name="MiddleSpacer" type="Control" parent="Root/Margin/Layout"]
+layout_mode = 2
+size_flags_vertical = 3
+mouse_filter = 2
+
+[node name="Toolbar" type="HBoxContainer" parent="Root/Margin/Layout"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_constants/separation = 10
+alignment = 1
+
+[node name="GameOver" type="CenterContainer" parent="Root"]
+visible = false
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 0
+
+[node name="Panel" type="PanelContainer" parent="Root/GameOver"]
+custom_minimum_size = Vector2(520, 0)
+layout_mode = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_panel")
+
+[node name="Layout" type="VBoxContainer" parent="Root/GameOver/Panel"]
+layout_mode = 2
+theme_override_constants/separation = 18
+
+[node name="Title" type="Label" parent="Root/GameOver/Panel/Layout"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 34
+text = "Você defendeu o núcleo!"
+horizontal_alignment = 1
+
+[node name="Message" type="Label" parent="Root/GameOver/Panel/Layout"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 17
+text = "Todas as ondas foram eliminadas."
+horizontal_alignment = 1
+autowrap_mode = 3
+
+[node name="RestartButton" type="Button" parent="Root/GameOver/Panel/Layout"]
+custom_minimum_size = Vector2(0, 52)
+layout_mode = 2
+focus_mode = 0
+text = "Jogar de novo  [R]"

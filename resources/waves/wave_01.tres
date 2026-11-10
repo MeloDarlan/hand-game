@@ -1,0 +1,17 @@
+[gd_resource type="Resource" script_class="WaveData" load_steps=5 format=3]
+
+[ext_resource type="Script" path="res://scripts/data/wave_data.gd" id="1_wave"]
+[ext_resource type="Script" path="res://scripts/data/wave_group.gd" id="2_group"]
+[ext_resource type="Resource" path="res://resources/enemies/runner.tres" id="3_runner"]
+
+[sub_resource type="Resource" id="WaveGroup_1"]
+script = ExtResource("2_group")
+enemy_data = ExtResource("3_runner")
+count = 8
+spawn_interval = 0.9
+start_delay = 0.0
+
+[resource]
+script = ExtResource("1_wave")
+groups = [SubResource("WaveGroup_1")]
+bonus_credits = 20
