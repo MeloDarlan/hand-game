@@ -79,11 +79,14 @@ Pela linha de comando (Windows):
 ## Estrutura do projeto
 
 ```text
-scenes/main.tscn                 cena principal
+scenes/ui/main_menu.tscn         tela inicial simples (Jogar / Sair)
+scenes/main.tscn                 cena principal de gameplay
 scenes/hand_player.tscn          mão: PalmPivot, HoldPoint, GrabArea, ArmJelly
 scenes/ui/hud.tscn               top bar, toolbar e overlay de fim de jogo
+scripts/ui/main_menu.gd          montagem da tela inicial
+scripts/audio/audio_manager.gd   efeitos pontuais de combate e vitória
 scripts/camera_iso.gd            câmera isométrica ortográfica
-scripts/board.gd                 grade, caminho, ocupação, highlight e range ring
+scripts/board.gd                 grade, caminho, ocupação, mapa simples, highlight e range ring
 scripts/hand_controller.gd       mão: mouse, pose, CATCH, grab e release_guard
 scripts/build/build_controller.gd  toolbar <-> mão <-> board, créditos, encaixe
 scripts/game/game_manager.gd     estado, créditos, vidas, vitória/derrota
@@ -94,11 +97,14 @@ scripts/data/                    Resources de balanceamento
 resources/                       torres, inimigos e ondas (.tres)
 occlusion_outline.gdshader       outline 2D das máscaras mão/peça
 assets/hand-game.glb             mão + CATCH/IDLE
-assets/oleos.glb                 asset antigo (não usado no MVP)
+assets/oleos.glb                 modelo do Olho Laser (reutiliza o olho verde original)
+assets/maps/arena_prototipo.glb   mapa 3D de protótipo, com cores chapadas e sem texturas
+assets/maps/preview_arena_prototipo.png prévia superior do mapa
+tools/generate_map_assets.py      gerador do GLB/preview (Python + trimesh + numpy + matplotlib)
+assets/audio/sfx/               efeitos curtos de tiro, laser, morte e vitória
 ```
 
-As esferas/cubo/olho de teste do protótipo original continuam em `scenes/`, mas
-não são mais instanciados na cena principal.
+As cenas de teste originais continuam em `scenes/`. O modelo `oleos.glb`, antes usado por `scenes/eye.tscn`, agora também é reutilizado como visual da torre especial Olho Laser.
 
 ## Ajustes rápidos (tuning)
 
@@ -121,7 +127,7 @@ na cena. O anel de validade acompanha o pé da peça.
 
 ## Pós-MVP
 
-Tema e arte final, áudio/VFX, upgrades e venda de torres, mais torres/inimigos,
+Tema e arte final, VFX adicionais, upgrades e venda de torres, mais torres/inimigos,
 mapas com caminhos diferentes e ondas infinitas. O próximo passo de feel é
 ajustar o swing da peça (`motion_*`) e, se quiser, adicionar reação no eixo de
 profundidade. Se a escala da mão incomodar, ajustar `hand_scale` e o fade do
@@ -135,3 +141,25 @@ antebraço para reduzir a mão sem expor o corte. Detalhes em `AGENT.md`.
 ## Licença
 
 Distribuído sob a licença MIT. Veja [LICENSE](LICENSE) para mais detalhes.
+
+
+## Build de protótipo — mapa simples e menu mínimo
+
+- `project.godot` abre `scenes/ui/main_menu.tscn` e registra `AudioManager` como autoload.
+- `Board` instancia `assets/maps/arena_prototipo.glb` para a grade 9×9; se o GLB não estiver importado ou a escala for alterada, usa o fallback procedural com as mesmas cores chapadas.
+- O GLB utiliza materiais PBR glTF explícitos (não depende de vertex colors). O `Board` também aplica uma paleta de `StandardMaterial3D` sem iluminação às malhas reconhecidas.
+- A estrada é redesenhada em runtime pelo Godot com `BoxMesh` e materiais sem iluminação, acima do piso. Isso evita que a rota desapareça por incompatibilidade do importador GLB ou fique atrás dos tiles. Os inimigos recebem waypoints em Y=0.102, logo acima da estrada.
+- A rota tem três faixas horizontais conectadas nas laterais. As 35 células do GLB correspondem a `Board._default_path()`.
+- O menu contém somente HAND DEFENSE, JOGAR e SAIR. Sem subtítulo, controles, painel ou música.
+- Permanecem somente efeitos de tiro comum, laser, morte de inimigo e conclusão da fase.
+- O Olho Laser continua sendo a quarta torre e reutiliza `assets/oleos.glb`.
+
+## Testes necessários no Godot 4.7
+
+1. Abra `project.godot` e aguarde a importação do GLB e dos WAVs.
+2. Execute F5 e confirme que o menu apresenta apenas título, Jogar e Sair.
+3. Clique em Jogar e verifique se a estrada está acima dos tiles e se acompanha a rota dos inimigos.
+4. Coloque cada torre, incluindo o Olho Laser, e confirme o encaixe na grade.
+5. Inicie as ondas, confira os disparos e os sons de tiro/morte/vitória.
+
+**Limitação:** não foi possível executar o Godot neste ambiente. As verificações realizadas são estáticas; compilação e gameplay precisam ser confirmados no editor.
