@@ -43,6 +43,11 @@ func sync_to_hold_point() -> void:
 		return
 
 	# Sem interpolação: cola exatamente na mão no mesmo frame.
+	_apply_hold_pose()
+
+## Ponto de extensão: subclasses podem manter a própria rotação (ex.: torres
+## continuam em pé enquanto a mão está virada com a palma para baixo).
+func _apply_hold_pose() -> void:
 	global_transform = _hold_point.global_transform
 
 func grab(point: Node3D) -> void:
@@ -63,7 +68,7 @@ func grab(point: Node3D) -> void:
 	angular_velocity = Vector3.ZERO
 
 	# Entra já na mão, sem deslizar da posição antiga até o HoldPoint.
-	global_transform = point.global_transform
+	_apply_hold_pose()
 
 	grabbed.emit(self)
 
