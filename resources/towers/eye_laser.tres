@@ -1,0 +1,23 @@
+[gd_resource type="Resource" script_class="TowerData" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/data/tower_data.gd" id="1_data"]
+[ext_resource type="PackedScene" path="res://assets/oleos.glb" id="2_eye"]
+
+[resource]
+script = ExtResource("1_data")
+display_name = "Olho Laser"
+cost = 45
+description = "O olho verde acompanha e atinge inimigos com um feixe de energia."
+color = Color(0.12, 0.32, 0.16, 1)
+grip_height = 1.08
+visual_scene = ExtResource("2_eye")
+visual_scale = 0.25
+muzzle_offset = Vector3(0, -0.21, -0.30)
+aim_yaw_offset_degrees = 180.0
+attack_mode = 1
+damage = 18.0
+attack_range = 6.0
+fire_interval = 1.5
+projectile_speed = 18.0
+slow_factor = 0.0
+slow_duration = 0.0

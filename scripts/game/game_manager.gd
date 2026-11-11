@@ -76,6 +76,8 @@ func _on_all_waves_cleared() -> void:
 		return
 	state = State.GAME_OVER
 	_refresh()
+	if has_node("/root/AudioManager"):
+		AudioManager.play_sfx("level_complete", 0.9)
 	_hud.show_game_over(true)
 
 

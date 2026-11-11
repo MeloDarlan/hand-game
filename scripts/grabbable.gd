@@ -16,6 +16,8 @@ signal released(body: Grabbable, velocity: Vector3)
 			_apply_color()
 
 var is_held := false
+## Impede captura durante fases em que a construção deve ficar bloqueada.
+@export var grab_locked := false
 
 var _hold_point: Node3D
 var _spawn_transform: Transform3D
@@ -51,7 +53,7 @@ func _apply_hold_pose() -> void:
 	global_transform = _hold_point.global_transform
 
 func grab(point: Node3D) -> void:
-	if is_held:
+	if is_held or grab_locked:
 		return
 
 	is_held = true

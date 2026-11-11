@@ -10,6 +10,7 @@ const DEFAULT_TOWER_PATHS := [
 	"res://resources/towers/cannon.tres",
 	"res://resources/towers/rapid.tres",
 	"res://resources/towers/frost.tres",
+	"res://resources/towers/eye_laser.tres",
 ]
 const INVALID_CELL := Vector2i(-999, -999)
 
@@ -24,6 +25,7 @@ var _hover_valid := false
 var _release_cell := INVALID_CELL
 var _placement_ring: MeshInstance3D
 var _placement_material: StandardMaterial3D
+var _tower_grab_lock_state := false
 
 @onready var _board: Board = %Board
 @onready var _hand: HandController = %HandPlayer
@@ -48,6 +50,7 @@ func _ready() -> void:
 
 
 func _process(_delta: float) -> void:
+	_sync_tower_grab_locks()
 	_update_hand_preview()
 
 	if _held == null:
@@ -104,13 +107,16 @@ func _unhandled_key_input(event: InputEvent) -> void:
 		KEY_3:
 			select_tower(2)
 			get_viewport().set_input_as_handled()
+		KEY_4:
+			select_tower(3)
+			get_viewport().set_input_as_handled()
 		KEY_ESCAPE:
 			cancel_placement()
 			get_viewport().set_input_as_handled()
 
 
 func select_tower(index: int) -> void:
-	if _game.state == GameManager.State.GAME_OVER:
+	if _game.state != GameManager.State.BUILD:
 		return
 	if index < 0 or index >= tower_types.size():
 		return
@@ -177,12 +183,14 @@ func _can_release_held() -> bool:
 
 
 func _pick_tower_at_hand() -> Grabbable:
+	if _game.state != GameManager.State.BUILD:
+		return null
 	var center := _hand.get_grab_region_position()
 	var radius := _hand.get_grab_radius()
 
 	var center_cell := _board.world_to_cell(center)
 	var center_tower := _board.get_tower(center_cell) as TowerPiece
-	if center_tower != null and not center_tower.is_held:
+	if center_tower != null and not center_tower.is_held and not center_tower.grab_locked:
 		return center_tower
 
 	# Fallback: a torre mais próxima dentro do anel do GrabArea.
@@ -190,7 +198,7 @@ func _pick_tower_at_hand() -> Grabbable:
 	var best_distance := radius
 	for child in _towers.get_children():
 		var tower := child as TowerPiece
-		if tower == null or not tower.is_placed or tower.is_held:
+		if tower == null or not tower.is_placed or tower.is_held or tower.grab_locked:
 			continue
 		var distance := Vector2(
 			tower.global_position.x - center.x,
@@ -200,6 +208,19 @@ func _pick_tower_at_hand() -> Grabbable:
 			best = tower
 			best_distance = distance
 	return best
+
+
+func _sync_tower_grab_locks() -> void:
+	var should_lock := _game.state != GameManager.State.BUILD
+	if should_lock and _held != null:
+		cancel_placement()
+	if should_lock == _tower_grab_lock_state:
+		return
+	_tower_grab_lock_state = should_lock
+	for child in _towers.get_children():
+		var tower := child as TowerPiece
+		if tower != null and tower.is_placed:
+			tower.grab_locked = should_lock
 
 
 func _update_hand_preview() -> void:

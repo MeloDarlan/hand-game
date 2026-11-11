@@ -143,13 +143,18 @@ func _process(delta: float) -> void:
 
 	_cooldown = maxf(_cooldown - delta, 0.0)
 	var target := _find_target()
+	var aligned_to_target := true
 
 	if target != null and _head != null:
 		var to := target.global_position - global_position
-		var desired := atan2(to.x, to.z)
+		var desired := atan2(to.x, to.z) + deg_to_rad(data.aim_yaw_offset_degrees)
+		var angular_error := absf(wrapf(desired - _head.rotation.y, -PI, PI))
 		_head.rotation.y = lerp_angle(_head.rotation.y, desired, minf(1.0, 10.0 * delta))
+		# O laser só dispara quando a pupila já está apontada para o alvo.
+		if data.attack_mode == 1:
+			aligned_to_target = angular_error <= deg_to_rad(9.0)
 
-	if target != null and _cooldown <= 0.0:
+	if target != null and _cooldown <= 0.0 and aligned_to_target:
 		_fire(target)
 		_cooldown = maxf(data.fire_interval, 0.05)
 
@@ -174,16 +179,73 @@ func _find_target() -> Enemy:
 
 
 func _fire(target: Enemy) -> void:
+	if data.attack_mode == 1:
+		if has_node("/root/AudioManager"):
+			AudioManager.play_sfx("laser", 0.85)
+		_fire_laser(target)
+		return
+
 	var container := get_tree().get_first_node_in_group(PROJECTILE_GROUP)
 	if container == null:
 		container = get_tree().current_scene
 	if container == null:
 		return
 
+	if has_node("/root/AudioManager"):
+		AudioManager.play_sfx("shot", 0.8)
 	var projectile := Projectile.new()
 	container.add_child(projectile)
 	var muzzle := _barrel_tip.global_position if _barrel_tip != null else global_position + Vector3(0.0, 0.85, 0.0)
 	projectile.setup(muzzle, target, data)
+
+
+func _fire_laser(target: Enemy) -> void:
+	if not is_instance_valid(target) or not target.is_alive:
+		return
+
+	var muzzle := _barrel_tip.global_position if _barrel_tip != null else _head.global_position
+	var target_point := target.global_position
+	if target.data != null:
+		target_point.y += target.data.height * 0.55
+
+	_create_laser_segment(muzzle, target_point, 0.065, Color(0.12, 1.0, 0.18, 0.38))
+	_create_laser_segment(muzzle, target_point, 0.024, Color(0.72, 1.0, 0.72, 1.0))
+	target.take_damage(data.damage)
+
+
+func _create_laser_segment(start: Vector3, finish: Vector3, radius: float, color: Color) -> void:
+	var distance := start.distance_to(finish)
+	if distance <= 0.01:
+		return
+
+	var beam := MeshInstance3D.new()
+	beam.name = "EyeLaserBeam"
+	var cylinder := CylinderMesh.new()
+	cylinder.top_radius = radius
+	cylinder.bottom_radius = radius
+	cylinder.height = distance
+	cylinder.radial_segments = 8
+	beam.mesh = cylinder
+
+	var material := StandardMaterial3D.new()
+	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA if color.a < 1.0 else BaseMaterial3D.TRANSPARENCY_DISABLED
+	material.albedo_color = color
+	material.emission_enabled = true
+	material.emission = Color(color.r, color.g, color.b)
+	material.emission_energy_multiplier = 2.5
+	beam.material_override = material
+
+	var scene_root := get_tree().current_scene
+	if scene_root == null:
+		return
+	scene_root.add_child(beam)
+	var direction := (finish - start).normalized()
+	beam.global_position = (start + finish) * 0.5
+	beam.global_basis = Basis(Quaternion(Vector3.UP, direction))
+
+	var timer := get_tree().create_timer(0.11)
+	timer.timeout.connect(beam.queue_free)
 
 
 func _build() -> void:
@@ -210,40 +272,52 @@ func _build() -> void:
 	base.position.y = 0.11
 	add_child(base)
 
-	var column := MeshInstance3D.new()
-	var column_mesh := CylinderMesh.new()
-	column_mesh.top_radius = 0.17
-	column_mesh.bottom_radius = 0.24
-	column_mesh.height = 0.5
-	column_mesh.radial_segments = 10
-	column.mesh = column_mesh
-	column.material_override = body_material
-	column.position.y = 0.47
-	add_child(column)
-
 	_head = Node3D.new()
 	_head.name = "Head"
-	_head.position.y = 0.82
+	_head.position.y = 0.66 if data.visual_scene != null else 0.82
 	add_child(_head)
 
-	var head_mesh := MeshInstance3D.new()
-	var head_box := BoxMesh.new()
-	head_box.size = Vector3(0.34, 0.26, 0.34)
-	head_mesh.mesh = head_box
-	head_mesh.material_override = body_material
-	_head.add_child(head_mesh)
+	if data.visual_scene != null:
+		var visual := data.visual_scene.instantiate() as Node3D
+		if visual != null:
+			visual.name = "TowerVisual"
+			visual.scale = Vector3.ONE * data.visual_scale
+			_head.add_child(visual)
 
-	var barrel := MeshInstance3D.new()
-	var barrel_box := BoxMesh.new()
-	barrel_box.size = Vector3(0.12, 0.12, 0.42)
-	barrel.mesh = barrel_box
-	barrel.material_override = body_material
-	barrel.position = Vector3(0.0, 0.0, 0.3)
-	_head.add_child(barrel)
+		_barrel_tip = Marker3D.new()
+		_barrel_tip.name = "LaserOrigin"
+		_barrel_tip.position = data.muzzle_offset
+		_head.add_child(_barrel_tip)
+	else:
+		var column := MeshInstance3D.new()
+		var column_mesh := CylinderMesh.new()
+		column_mesh.top_radius = 0.17
+		column_mesh.bottom_radius = 0.24
+		column_mesh.height = 0.5
+		column_mesh.radial_segments = 10
+		column.mesh = column_mesh
+		column.material_override = body_material
+		column.position.y = 0.47
+		add_child(column)
 
-	_barrel_tip = Marker3D.new()
-	_barrel_tip.position = Vector3(0.0, 0.0, 0.52)
-	_head.add_child(_barrel_tip)
+		var head_mesh := MeshInstance3D.new()
+		var head_box := BoxMesh.new()
+		head_box.size = Vector3(0.34, 0.26, 0.34)
+		head_mesh.mesh = head_box
+		head_mesh.material_override = body_material
+		_head.add_child(head_mesh)
+
+		var barrel := MeshInstance3D.new()
+		var barrel_box := BoxMesh.new()
+		barrel_box.size = Vector3(0.12, 0.12, 0.42)
+		barrel.mesh = barrel_box
+		barrel.material_override = body_material
+		barrel.position = Vector3(0.0, 0.0, 0.3)
+		_head.add_child(barrel)
+
+		_barrel_tip = Marker3D.new()
+		_barrel_tip.position = Vector3(0.0, 0.0, 0.52)
+		_head.add_child(_barrel_tip)
 
 	var collision := CollisionShape3D.new()
 	var shape := SphereShape3D.new()

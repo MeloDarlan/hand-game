@@ -42,7 +42,7 @@ func setup_towers(tower_defs: Array) -> void:
 		var button := Button.new()
 		button.text = "%d · %s — %d" % [i + 1, tower.display_name, tower.cost]
 		button.tooltip_text = tower.description
-		button.custom_minimum_size = Vector2(185.0, 54.0)
+		button.custom_minimum_size = Vector2(160.0, 54.0)
 		button.toggle_mode = true
 		button.focus_mode = Control.FOCUS_NONE
 		button.add_theme_font_size_override("font_size", 17)

@@ -93,23 +93,35 @@ func _tick_slow(delta: float) -> void:
 
 
 func _follow_path(delta: float) -> void:
-	if _index >= _waypoints.size():
+	if data == null or _index >= _waypoints.size():
 		_leak()
 		return
 
-	var target := _waypoints[_index]
-	var to := Vector3(target.x - global_position.x, 0.0, target.z - global_position.z)
-	var step := data.speed * _speed_multiplier * delta
+	var remaining := data.speed * _speed_multiplier * delta
+	var last_direction := Vector3.ZERO
+	while remaining > 0.0 and _index < _waypoints.size():
+		var target := _waypoints[_index]
+		var to := Vector3(target.x - global_position.x, 0.0, target.z - global_position.z)
+		var distance := to.length()
+		if distance <= 0.0001:
+			global_position = target
+			_index += 1
+			continue
 
-	if to.length() <= step:
-		global_position = target
-		_index += 1
-		if _index >= _waypoints.size():
-			_leak()
-		return
+		last_direction = to / distance
+		if distance <= remaining:
+			global_position = target
+			remaining -= distance
+			_index += 1
+		else:
+			global_position += last_direction * remaining
+			remaining = 0.0
 
-	global_position += to.normalized() * step
-	rotation.y = lerp_angle(rotation.y, atan2(to.x, to.z), minf(1.0, 12.0 * delta))
+	if last_direction.length_squared() > 0.0001:
+		rotation.y = lerp_angle(rotation.y, atan2(last_direction.x, last_direction.z), minf(1.0, 12.0 * delta))
+
+	if _index >= _waypoints.size():
+		_leak()
 
 
 func take_damage(amount: float) -> void:
@@ -149,6 +161,8 @@ func _die() -> void:
 	if not is_alive:
 		return
 	is_alive = false
+	if has_node("/root/AudioManager"):
+		AudioManager.play_sfx("enemy_down", 0.75)
 	died.emit(self)
 	queue_free()
 

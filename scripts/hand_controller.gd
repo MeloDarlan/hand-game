@@ -708,7 +708,7 @@ func _try_grab() -> void:
 
 	for hit in hits:
 		var body := hit.get("collider") as Grabbable
-		if body == null or body.is_held:
+		if body == null or body.is_held or body.grab_locked:
 			continue
 
 		var screen_position := Vector2.ZERO
@@ -734,6 +734,8 @@ func _try_grab() -> void:
 
 
 func _grab(body: Grabbable) -> void:
+	if body == null or body.grab_locked or body.is_held:
+		return
 	_held = body
 	_prev_hold_pos = hold_point.global_position
 	_hold_velocity = Vector3.ZERO
