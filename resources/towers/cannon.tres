@@ -1,6 +1,6 @@
-[gd_resource type="Resource" script_class="TowerData" load_steps=2 format=3]
+[gd_resource type="Resource" script_class="TowerData" format=3 uid="uid://b68uhhdyo7bda"]
 
-[ext_resource type="Script" path="res://scripts/data/tower_data.gd" id="1_data"]
+[ext_resource type="Script" uid="uid://bcujgycrpxc5p" path="res://scripts/data/tower_data.gd" id="1_data"]
 
 [resource]
 script = ExtResource("1_data")
@@ -11,6 +11,5 @@ color = Color(0.95, 0.8, 0.25, 1)
 damage = 24.0
 attack_range = 4.5
 fire_interval = 1.2
-projectile_speed = 12.0
-slow_factor = 0.0
-slow_duration = 0.0
+anticipation_enabled = true
+anticipation_duration = 0.2

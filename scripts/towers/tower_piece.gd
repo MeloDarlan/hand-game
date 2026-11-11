@@ -26,6 +26,8 @@ var cell := INVALID_CELL
 
 var _head: Node3D
 var _barrel_tip: Marker3D
+var _squash_pivot: Node3D
+var _anticipation_tween: Tween
 var _cooldown := 0.0
 var _built := false
 
@@ -60,6 +62,11 @@ func get_grip_height() -> float:
 func _apply_hold_pose() -> void:
 	if not is_instance_valid(_hold_point):
 		return
+
+	# Se a torre for pega durante a antecipação, cancela o tiro pendente e
+	# restaura a escala antes de pendurar a peça na mão.
+	if _anticipation_tween != null:
+		_cancel_anticipation()
 
 	# A mão pinça o TOPO da peça. A base canônica pende abaixo do HoldPoint,
 	# mas o visual pode balançar em torno dele (lag/inércia do mouse).
@@ -126,6 +133,7 @@ func place(target_cell: Vector2i, world_position: Vector3) -> void:
 	_motion_initialized = false
 	_swing = Vector2.ZERO
 	_swing_velocity = Vector2.ZERO
+	_cancel_anticipation()
 	global_position = world_position
 	rotation = Vector3.ZERO
 	PhysicsServer3D.body_set_state(
@@ -154,7 +162,9 @@ func _process(delta: float) -> void:
 		if data.attack_mode == 1:
 			aligned_to_target = angular_error <= deg_to_rad(9.0)
 
-	if target != null and _cooldown <= 0.0 and aligned_to_target:
+	# Enquanto a antecipação está rolando, não inicia outro wind-up: o próximo
+	# `_fire` cancelaria o tween anterior antes do callback e o tiro nunca sairia.
+	if target != null and _cooldown <= 0.0 and aligned_to_target and _anticipation_tween == null:
 		_fire(target)
 		_cooldown = maxf(data.fire_interval, 0.05)
 
@@ -179,6 +189,20 @@ func _find_target() -> Enemy:
 
 
 func _fire(target: Enemy) -> void:
+	if data.anticipation_enabled and _squash_pivot != null:
+		_play_anticipation(target)
+		return
+	_shoot(target)
+
+
+func _shoot(target: Enemy) -> void:
+	# O callback da antecipação pode chegar depois de o alvo morrer ou de a
+	# torre ser pega/reposicionada.
+	if not is_placed or data == null:
+		return
+	if target == null or not is_instance_valid(target) or not target.is_alive:
+		return
+
 	if data.attack_mode == 1:
 		if has_node("/root/AudioManager"):
 			AudioManager.play_sfx("laser", 0.85)
@@ -192,11 +216,48 @@ func _fire(target: Enemy) -> void:
 		return
 
 	if has_node("/root/AudioManager"):
-		AudioManager.play_sfx("shot", 0.8)
+		AudioManager.play_sfx("shot_pew", 0.8)
 	var projectile := Projectile.new()
 	container.add_child(projectile)
 	var muzzle := _barrel_tip.global_position if _barrel_tip != null else global_position + Vector3(0.0, 0.85, 0.0)
 	projectile.setup(muzzle, target, data)
+
+
+func _play_anticipation(target: Enemy) -> void:
+	_cancel_anticipation()
+
+	var squash := maxf(data.anticipation_squash, 0.0)
+	var stretch := maxf(data.anticipation_stretch, 0.0)
+	var duration := maxf(data.anticipation_duration, 0.1)
+	var squashed := Vector3(1.0 + squash, 1.0 - squash, 1.0 + squash)
+	var stretched := Vector3(1.0 - stretch * 0.5, 1.0 + stretch, 1.0 - stretch * 0.5)
+
+	# Squash (wind-up) -> stretch -> disparo -> assentamento. O tiro só sai no
+	# callback, depois da antecipação; nada é disparado ao iniciar o tween.
+	_anticipation_tween = create_tween()
+	_anticipation_tween.tween_property(
+		_squash_pivot, "scale", squashed, duration * 0.45
+	).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	_anticipation_tween.tween_property(
+		_squash_pivot, "scale", stretched, duration * 0.30
+	).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	_anticipation_tween.tween_callback(_shoot.bind(target))
+	_anticipation_tween.tween_property(
+		_squash_pivot, "scale", Vector3.ONE, duration * 0.25
+	).set_trans(Tween.TRANS_ELASTIC).set_ease(Tween.EASE_OUT)
+	_anticipation_tween.finished.connect(_on_anticipation_finished)
+
+
+func _on_anticipation_finished() -> void:
+	_anticipation_tween = null
+
+
+func _cancel_anticipation() -> void:
+	if _anticipation_tween != null and _anticipation_tween.is_valid():
+		_anticipation_tween.kill()
+	_anticipation_tween = null
+	if _squash_pivot != null:
+		_squash_pivot.scale = Vector3.ONE
 
 
 func _fire_laser(target: Enemy) -> void:
@@ -261,7 +322,14 @@ func _build() -> void:
 	body_material.emission = data.color
 	body_material.emission_energy_multiplier = 0.18
 
+	# Deformação da antecipação: o pivô envolve o modelo inteiro (base, coluna,
+	# cabeça e visual). A colisão fica fora para não afetar a física.
+	_squash_pivot = Node3D.new()
+	_squash_pivot.name = "SquashPivot"
+	add_child(_squash_pivot)
+
 	var base := MeshInstance3D.new()
+	base.name = "Base"
 	var base_mesh := CylinderMesh.new()
 	base_mesh.top_radius = 0.34
 	base_mesh.bottom_radius = 0.4
@@ -270,12 +338,12 @@ func _build() -> void:
 	base.mesh = base_mesh
 	base.material_override = body_material
 	base.position.y = 0.11
-	add_child(base)
+	_squash_pivot.add_child(base)
 
 	_head = Node3D.new()
 	_head.name = "Head"
 	_head.position.y = 0.66 if data.visual_scene != null else 0.82
-	add_child(_head)
+	_squash_pivot.add_child(_head)
 
 	if data.visual_scene != null:
 		var visual := data.visual_scene.instantiate() as Node3D
@@ -298,7 +366,7 @@ func _build() -> void:
 		column.mesh = column_mesh
 		column.material_override = body_material
 		column.position.y = 0.47
-		add_child(column)
+		_squash_pivot.add_child(column)
 
 		var head_mesh := MeshInstance3D.new()
 		var head_box := BoxMesh.new()

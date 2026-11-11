@@ -1,16 +1,19 @@
-[gd_resource type="Resource" script_class="TowerData" load_steps=2 format=3]
+[gd_resource type="Resource" script_class="TowerData" format=3 uid="uid://cm24vdspyg1xy"]
 
-[ext_resource type="Script" path="res://scripts/data/tower_data.gd" id="1_data"]
+[ext_resource type="Script" uid="uid://bcujgycrpxc5p" path="res://scripts/data/tower_data.gd" id="1_data"]
 
 [resource]
 script = ExtResource("1_data")
 display_name = "Gelo"
 cost = 25
 description = "Dano baixo, mas desacelera tudo que passa perto."
-color = Color(0.6, 0.8, 1.0, 1)
+color = Color(0.6, 0.8, 1, 1)
 damage = 3.0
 attack_range = 3.8
 fire_interval = 0.9
 projectile_speed = 14.0
 slow_factor = 0.4
 slow_duration = 1.8
+anticipation_enabled = true
+anticipation_duration = 0.6
+anticipation_stretch = 0.18

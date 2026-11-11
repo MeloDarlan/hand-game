@@ -4,7 +4,7 @@ class_name AudioManagerService
 ## SFX pontuais de combate e conclusão. Não há música de fundo.
 
 const SFX_PATHS := {
-	"shot": "res://assets/audio/sfx/shot_pew.wav",
+	"shot_pew": "res://assets/audio/sfx/shot_pew.wav",
 	"laser": "res://assets/audio/sfx/laser_shot.wav",
 	"enemy_down": "res://assets/audio/sfx/enemy_down.wav",
 	"level_complete": "res://assets/audio/sfx/level_complete.wav",

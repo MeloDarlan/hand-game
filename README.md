@@ -47,11 +47,11 @@ Inimigos: **Corredor** (rápido/frágil) e **Bruto** (lento/resistente).
 | Pegar / interagir com a peça | Clique esquerdo |
 | Soltar e encaixar no tile | Clique esquerdo (press + release) |
 | Escolher torre | Clique na toolbar |
-| Ciclar torres | Scroll do mouse ou `1`/`2`/`3` |
+| Ciclar torres | Scroll do mouse ou `1`/`2`/`3`/`4` |
 | Alternar FOLLOW_MOUSE / FIXED_ARM | `M` |
 | Cancelar / devolver torre | Clique direito, `Esc` ou clicar de novo no botão selecionado |
 | Iniciar onda | `Espaço` ou botão "Iniciar onda" |
-| Reiniciar após fim de jogo | `R` ou botão do overlay |
+| Reiniciar a fase | `R` (a qualquer momento) ou botão do overlay no fim de jogo |
 | +100 créditos (debug) | `F2` |
 
 Soltar em tile inválido (caminho, ocupado ou fora do tabuleiro) não solta a
@@ -79,12 +79,12 @@ Pela linha de comando (Windows):
 ## Estrutura do projeto
 
 ```text
-scenes/ui/main_menu.tscn         tela inicial simples (Jogar / Sair)
+scenes/ui/main_menu.tscn         cena inicial simples (Jogar / Sair)
 scenes/main.tscn                 cena principal de gameplay
 scenes/hand_player.tscn          mão: PalmPivot, HoldPoint, GrabArea, ArmJelly
 scenes/ui/hud.tscn               top bar, toolbar e overlay de fim de jogo
 scripts/ui/main_menu.gd          montagem da tela inicial
-scripts/audio/audio_manager.gd   efeitos pontuais de combate e vitória
+scripts/audio/audio_manager.gd   autoload de efeitos pontuais de combate e vitória
 scripts/camera_iso.gd            câmera isométrica ortográfica
 scripts/board.gd                 grade, caminho, ocupação, mapa simples, highlight e range ring
 scripts/hand_controller.gd       mão: mouse, pose, CATCH, grab e release_guard
@@ -100,9 +100,14 @@ assets/hand-game.glb             mão + CATCH/IDLE
 assets/oleos.glb                 modelo do Olho Laser (reutiliza o olho verde original)
 assets/maps/arena_prototipo.glb   mapa 3D de protótipo, com cores chapadas e sem texturas
 assets/maps/preview_arena_prototipo.png prévia superior do mapa
-tools/generate_map_assets.py      gerador do GLB/preview (Python + trimesh + numpy + matplotlib)
 assets/audio/sfx/               efeitos curtos de tiro, laser, morte e vitória
+tools/generate_map_assets.py      gerador do GLB/preview (Python + trimesh + numpy + matplotlib)
+tools/generate_audio_assets.py    gerador dos WAVs de efeito
+docs/                            notas de alterações, áudio/torre e correção do mapa cinza
 ```
+
+`project.godot` aponta `run/main_scene` para o menu e registra `AudioManager`
+na seção `[autoload]`. O botão JOGAR troca para `scenes/main.tscn`.
 
 As cenas de teste originais continuam em `scenes/`. O modelo `oleos.glb`, antes usado por `scenes/eye.tscn`, agora também é reutilizado como visual da torre especial Olho Laser.
 
@@ -120,6 +125,8 @@ As cenas de teste originais continuam em `scenes/`. O modelo `oleos.glb`, antes 
 | Fade do antebraço | `forearm_fade_start` / `forearm_fade_strength` no `ArmJelly` |
 | Swing da peça carregada | `motion_*` no `TowerPiece` (Remote da peça segurada) |
 | Cor/espessura do outline | `outline_color` / `outline_size` no `OcclusionOutline` |
+| Volume dos SFX / vozes | `sfx_volume` / `sfx_voice_count` no autoload `AudioManager` |
+| Antecipação do Olho Laser | `anticipation_enabled`, `anticipation_duration`, `anticipation_squash`, `anticipation_stretch` em `resources/towers/eye_laser.tres` |
 
 Os exports do `HandPlayer` e do `ArmJelly`/`OcclusionOutline` aplicam na hora
 (setters + `apply_pose`); o `pinch_offset` sobrescreve o Transform do HoldPoint
@@ -151,8 +158,12 @@ Distribuído sob a licença MIT. Veja [LICENSE](LICENSE) para mais detalhes.
 - A estrada é redesenhada em runtime pelo Godot com `BoxMesh` e materiais sem iluminação, acima do piso. Isso evita que a rota desapareça por incompatibilidade do importador GLB ou fique atrás dos tiles. Os inimigos recebem waypoints em Y=0.102, logo acima da estrada.
 - A rota tem três faixas horizontais conectadas nas laterais. As 35 células do GLB correspondem a `Board._default_path()`.
 - O menu contém somente HAND DEFENSE, JOGAR e SAIR. Sem subtítulo, controles, painel ou música.
-- Permanecem somente efeitos de tiro comum, laser, morte de inimigo e conclusão da fase.
+- Permanecem somente efeitos de tiro comum, laser, morte de inimigo e conclusão da fase. As chaves de SFX são `shot_pew`, `laser`, `enemy_down` e `level_complete`.
 - O Olho Laser continua sendo a quarta torre e reutiliza `assets/oleos.glb`.
+- Antes de cada feixe, o Olho Laser faz uma antecipação de escala (squash e stretch) no modelo inteiro e só dispara depois dela. O recurso fica em `TowerData.anticipation_*` e está ativo no `eye_laser.tres`; o `frost.tres` também está habilitado para testes.
+- Se `anticipation_duration` for maior que `fire_interval`, a animação limita a cadência (`max(fire_interval, anticipation_duration)`); o tiro não é cancelado pelo wind-up seguinte.
+- `R` reinicia a fase em qualquer momento (BUILD, WAVE ou fim de jogo).
+- Se o mapa aparecer cinza após uma mudança, apague somente `.godot/imported` e reabra o projeto para forçar a reimportação. Não apague `assets/`.
 
 ## Testes necessários no Godot 4.7
 
@@ -160,6 +171,8 @@ Distribuído sob a licença MIT. Veja [LICENSE](LICENSE) para mais detalhes.
 2. Execute F5 e confirme que o menu apresenta apenas título, Jogar e Sair.
 3. Clique em Jogar e verifique se a estrada está acima dos tiles e se acompanha a rota dos inimigos.
 4. Coloque cada torre, incluindo o Olho Laser, e confirme o encaixe na grade.
-5. Inicie as ondas, confira os disparos e os sons de tiro/morte/vitória.
+5. Confirme que o Olho Laser faz squash/stretch antes do feixe e que as demais torres não deformam.
+6. Inicie as ondas, confira os disparos e os sons de tiro/morte/vitória.
+7. Pressione `R` em BUILD, durante uma onda e no fim de jogo para confirmar o restart.
 
-**Limitação:** não foi possível executar o Godot neste ambiente. As verificações realizadas são estáticas; compilação e gameplay precisam ser confirmados no editor.
+**Limitação:** o projeto foi carregado no Godot 4.7 headless (scripts e cenas sem erros de parse/importação), mas o gameplay visual e a reprodução dos WAVs precisam ser confirmados no editor.

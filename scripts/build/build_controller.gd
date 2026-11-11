@@ -1,10 +1,8 @@
 extends Node
 class_name BuildController
 
-## Media a toolbar, a mão e o tabuleiro.
 ## Fluxo: escolher torre -> peça nasce na mão (CATCH) -> soltar em tile válido
-## -> encaixa e cobra. Pegar uma torre colocada com CATCH permite reposicionar.
-## A mão não conhece torres: ela só consulta release_guard antes de soltar.
+## -> encaixa e cobra.
 
 const DEFAULT_TOWER_PATHS := [
 	"res://resources/towers/cannon.tres",
@@ -56,8 +54,6 @@ func _process(_delta: float) -> void:
 	if _held == null:
 		return
 
-	# O grip pode ser ajustado no listener (TowerPiece.grip_height); o anel
-	# acompanha o pé da peça mesmo sem mudar de célula.
 	if _placement_ring != null and _placement_ring.visible:
 		_placement_ring.position = Vector3(0.0, -_held.get_grip_height(), 0.0)
 
