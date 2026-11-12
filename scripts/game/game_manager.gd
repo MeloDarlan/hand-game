@@ -15,6 +15,7 @@ var lives := STARTING_LIVES
 
 @onready var _hud: GameHUD = %HUD
 @onready var _waves: WaveManager = %WaveManager
+@onready var _board: Board = %Board
 
 
 func _ready() -> void:
@@ -46,6 +47,7 @@ func add_credits(amount: int) -> void:
 
 
 func _refresh() -> void:
+	_board.rotation_enabled = state == State.BUILD
 	_hud.set_credits(credits)
 	_hud.set_lives(lives)
 	_hud.set_wave(_waves.get_current_wave_number(), _waves.get_wave_count())

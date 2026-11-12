@@ -59,17 +59,29 @@ func get_grip_height() -> float:
 	return grip_height
 
 
+## Move somente o visual (SquashPivot) em espaço global, sem tocar no
+## RigidBody3D. Usado pelo Board durante o giro; o corpo é teleportado uma única
+## vez quando a animação termina.
+func sync_visual_to(world_transform: Transform3D) -> void:
+	if _squash_pivot == null:
+		return
+	_squash_pivot.global_transform = world_transform
+
+
+func reset_visual_transform() -> void:
+	if _squash_pivot == null:
+		return
+	_squash_pivot.position = Vector3.ZERO
+	_squash_pivot.rotation = Vector3.ZERO
+
+
 func _apply_hold_pose() -> void:
 	if not is_instance_valid(_hold_point):
 		return
 
-	# Se a torre for pega durante a antecipação, cancela o tiro pendente e
-	# restaura a escala antes de pendurar a peça na mão.
 	if _anticipation_tween != null:
 		_cancel_anticipation()
-
-	# A mão pinça o TOPO da peça. A base canônica pende abaixo do HoldPoint,
-	# mas o visual pode balançar em torno dele (lag/inércia do mouse).
+	reset_visual_transform()
 	var anchor := _hold_point.global_transform
 	if not _motion_initialized:
 		_prev_anchor = anchor.origin
@@ -136,6 +148,7 @@ func place(target_cell: Vector2i, world_position: Vector3) -> void:
 	_cancel_anticipation()
 	global_position = world_position
 	rotation = Vector3.ZERO
+	reset_visual_transform()
 	PhysicsServer3D.body_set_state(
 		get_rid(),
 		PhysicsServer3D.BODY_STATE_TRANSFORM,
@@ -155,7 +168,10 @@ func _process(delta: float) -> void:
 
 	if target != null and _head != null:
 		var to := target.global_position - global_position
-		var desired := atan2(to.x, to.z) + deg_to_rad(data.aim_yaw_offset_degrees)
+		# A torre herda o yaw do Board (o nó Towers fica dentro dele), então o
+		# alvo é convertido para o espaço local da torre antes de girar a cabeça.
+		var local_to := global_transform.basis.orthonormalized().inverse() * to
+		var desired := atan2(local_to.x, local_to.z) + deg_to_rad(data.aim_yaw_offset_degrees)
 		var angular_error := absf(wrapf(desired - _head.rotation.y, -PI, PI))
 		_head.rotation.y = lerp_angle(_head.rotation.y, desired, minf(1.0, 10.0 * delta))
 		# O laser só dispara quando a pupila já está apontada para o alvo.
@@ -196,8 +212,6 @@ func _fire(target: Enemy) -> void:
 
 
 func _shoot(target: Enemy) -> void:
-	# O callback da antecipação pode chegar depois de o alvo morrer ou de a
-	# torre ser pega/reposicionada.
 	if not is_placed or data == null:
 		return
 	if target == null or not is_instance_valid(target) or not target.is_alive:
@@ -225,26 +239,17 @@ func _shoot(target: Enemy) -> void:
 
 func _play_anticipation(target: Enemy) -> void:
 	_cancel_anticipation()
-
 	var squash := maxf(data.anticipation_squash, 0.0)
 	var stretch := maxf(data.anticipation_stretch, 0.0)
 	var duration := maxf(data.anticipation_duration, 0.1)
 	var squashed := Vector3(1.0 + squash, 1.0 - squash, 1.0 + squash)
 	var stretched := Vector3(1.0 - stretch * 0.5, 1.0 + stretch, 1.0 - stretch * 0.5)
 
-	# Squash (wind-up) -> stretch -> disparo -> assentamento. O tiro só sai no
-	# callback, depois da antecipação; nada é disparado ao iniciar o tween.
 	_anticipation_tween = create_tween()
-	_anticipation_tween.tween_property(
-		_squash_pivot, "scale", squashed, duration * 0.45
-	).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
-	_anticipation_tween.tween_property(
-		_squash_pivot, "scale", stretched, duration * 0.30
-	).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	_anticipation_tween.tween_property(_squash_pivot, "scale", squashed, duration * 0.45).set_trans(Tween.TRANS_BOUNCE).set_ease(Tween.EASE_OUT)
+	_anticipation_tween.tween_property(_squash_pivot, "scale", stretched, duration * 0.30).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 	_anticipation_tween.tween_callback(_shoot.bind(target))
-	_anticipation_tween.tween_property(
-		_squash_pivot, "scale", Vector3.ONE, duration * 0.25
-	).set_trans(Tween.TRANS_ELASTIC).set_ease(Tween.EASE_OUT)
+	_anticipation_tween.tween_property(_squash_pivot, "scale", Vector3.ONE, duration * 0.45).set_trans(Tween.TRANS_ELASTIC).set_ease(Tween.EASE_OUT)
 	_anticipation_tween.finished.connect(_on_anticipation_finished)
 
 
