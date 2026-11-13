@@ -21,6 +21,22 @@ const PROTOTYPE_MAP_PATH := "res://assets/maps/arena_prototipo.glb"
 @export var hand_preview_color := Color(0.35, 0.85, 1.0, 0.42)
 @export var hand_ring_color := Color(0.35, 0.85, 1.0, 0.32)
 
+@export_group("Rotation")
+## Passo do giro do tabuleiro a cada toque de Q/E, em graus.
+@export var rotation_step_degrees := 90.0
+## Duração base do giro de 90° (o bounce overshoot usa TRANS_BACK).
+@export var rotation_duration := 0.34
+
+## Ligado apenas na fase BUILD pelo GameManager (evita girar durante a onda).
+## Ao desligar, finaliza a animação imediatamente para alinhar tudo.
+var rotation_enabled := true:
+	set(value):
+		if rotation_enabled == value:
+			return
+		rotation_enabled = value
+		if not value:
+			finish_rotation()
+
 ## Caminho em células. Vazio = rota serpentina de três faixas.
 var path_cells: Array = []
 
@@ -34,6 +50,8 @@ var _hand_highlight_material: StandardMaterial3D
 var _hand_ring: MeshInstance3D
 var _built := false
 var _using_external_map := false
+var _target_rotation_y := 0.0
+var _rotation_tween: Tween
 
 
 func _ready() -> void:
@@ -43,6 +61,118 @@ func _ready() -> void:
 	for cell in path_cells:
 		_path_lookup[cell] = true
 	_build()
+
+
+func _unhandled_key_input(event: InputEvent) -> void:
+	if not rotation_enabled:
+		return
+	if not (event is InputEventKey) or not event.pressed or event.echo:
+		return
+
+	# Compara também physical_keycode para layouts/IME que não preenchem keycode.
+	var key_event := event as InputEventKey
+	var direction := 0.0
+	if key_event.keycode == KEY_Q or key_event.physical_keycode == KEY_Q:
+		direction += 1.0
+	elif key_event.keycode == KEY_E or key_event.physical_keycode == KEY_E:
+		direction -= 1.0
+	if is_zero_approx(direction):
+		return
+
+	# Cada toque soma um passo fixo (90° por padrão) ao alvo acumulado.
+	# Segurar a tecla não repete graças ao filtro de event.echo. Q gira para a
+	# esquerda na tela; E para a direita. As demais operações (world_to_cell,
+	# cell_to_world, clamp, highlights) usam o transform local e acompanham.
+	_target_rotation_y += deg_to_rad(rotation_step_degrees) * direction
+	_animate_rotation()
+	get_viewport().set_input_as_handled()
+
+
+func _animate_rotation() -> void:
+	if _rotation_tween != null and _rotation_tween.is_valid():
+		_rotation_tween.kill()
+	_rotation_tween = null
+
+	var remaining := _target_rotation_y - rotation.y
+	if absf(remaining) <= 0.0001:
+		_finish_board_rotation()
+		return
+
+	# Escala a duração pela distância restante para toques encadeados não
+	# ficarem rápidos demais nem travarem a animação anterior.
+	var step := deg_to_rad(maxf(rotation_step_degrees, 1.0))
+	var step_count := maxf(absf(remaining) / step, 1.0)
+	var duration := maxf(rotation_duration * step_count, 0.05)
+
+	_rotation_tween = create_tween()
+	# TRANS_BACK/EASE_OUT gira um pouco além do alvo e volta (bounce).
+	# tween_method aplica o ângulo e sincroniza as torres no mesmo passo do
+	# Tween: Tweens rodam depois de _process, então um _process separado
+	# deixaria o visual das torres 1 frame atrasado.
+	_rotation_tween.tween_method(
+		_apply_board_angle,
+		rotation.y,
+		_target_rotation_y,
+		duration
+	).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	_rotation_tween.finished.connect(_on_rotation_tween_finished)
+
+
+func _apply_board_angle(value: float) -> void:
+	rotation.y = value
+	_sync_placed_towers()
+
+
+func _finish_board_rotation() -> void:
+	# Normaliza só depois do bounce: normalizar durante o tween poderia fazer o
+	# giro pegar o caminho inverso (ex.: 180° virando -180°).
+	var normalized := wrapf(_target_rotation_y, -PI, PI)
+	_target_rotation_y = normalized
+	rotation.y = normalized
+	_sync_placed_towers()
+
+
+func _on_rotation_tween_finished() -> void:
+	_rotation_tween = null
+	_finish_board_rotation()
+	_finalize_placed_towers()
+
+
+## Encaixa o giro no alvo e finaliza as torres (usado ao sair de BUILD).
+func finish_rotation() -> void:
+	if _rotation_tween != null and _rotation_tween.is_valid():
+		_rotation_tween.kill()
+	_rotation_tween = null
+	_finish_board_rotation()
+	_finalize_placed_towers()
+
+
+## Move apenas o visual das torres durante a animação. Os RigidBody3D ficam
+## congelados no lugar e são teleportados uma única vez no fim; mover o corpo
+## todo frame fazia o physics server devolvê-lo ao transform antigo.
+func _sync_placed_towers() -> void:
+	if _occupancy.is_empty():
+		return
+
+	for cell in _occupancy:
+		var tower := _occupancy[cell] as TowerPiece
+		if tower == null or not tower.is_placed or tower.is_held:
+			continue
+
+		# Usa o ângulo atual do Board, sem offset: as torres acompanham o giro
+		# exatamente no mesmo passo do Tween.
+		var xform := Transform3D(Basis(Vector3.UP, rotation.y), cell_to_world(cell))
+		tower.sync_visual_to(xform)
+
+
+## Coloca os corpos na célula final e devolve o visual ao local. Usa o mesmo
+## caminho de place(), que já força o estado no physics server.
+func _finalize_placed_towers() -> void:
+	for cell in _occupancy:
+		var tower := _occupancy[cell] as TowerPiece
+		if tower == null or not tower.is_placed or tower.is_held:
+			continue
+		tower.place(cell, cell_to_world(cell))
 
 
 func _default_path() -> Array:
@@ -406,6 +536,16 @@ func clamp_world_position(world: Vector3, margin: float) -> Vector3:
 	local.x = clampf(local.x, -limit_x, limit_x)
 	local.z = clampf(local.z, -limit_z, limit_z)
 	return to_global(local)
+
+
+## True quando o ponto está além da borda externa da grade + margin. É o
+## limiar de queda: dentro dessa faixa a peça continua na mão, para não cair
+## visualmente em cima do tabuleiro.
+func is_beyond_drop_margin(world: Vector3, margin: float) -> bool:
+	var limit_x := grid_size.x * tile_size * 0.5 + margin
+	var limit_z := grid_size.y * tile_size * 0.5 + margin
+	var local := to_local(world)
+	return absf(local.x) > limit_x or absf(local.z) > limit_z
 
 
 func show_highlight(cell: Vector2i, valid: bool) -> void:

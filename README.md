@@ -25,9 +25,16 @@ o cursor no próximo movimento do mouse.
 
 ## Fluxo (MVP)
 
-- **BUILD**: escolher uma torre e posicionar com a mão.
-- **WAVE**: iniciar a onda; as torres miram e atiram sozinhas.
-- Limpar as 3 ondas = vitória. Perder 10 vidas = derrota.
+- **BUILD**: escolher uma das **4 torres** na toolbar (clique, scroll ou
+  `1`–`4`) e posicionar com a mão. Torres já colocadas podem ser pegas e
+  movidas sem custo. `Q`/`E` giram o tabuleiro em passos de 90° (com bounce),
+  somente nessa fase.
+- **WAVE**: iniciar com `Espaço` ou botão; as torres miram e atiram sozinhas.
+  Cada abate rende créditos (Corredor: 6, Bruto: 12) e limpar a onda paga um
+  bônus de 20/30/40.
+- 3 ondas: 8 corredores; 10 corredores + 4 brutos; 14 corredores + 6 brutos.
+- Limpar as 3 ondas = vitória. Perder 10 vidas = derrota. Começa com 100
+  créditos e 10 vidas.
 - Tema provisório com primitivas; torres, inimigos e ondas são data-driven
   (`resources/`), prontos para trocar a arte.
 
@@ -35,7 +42,8 @@ o cursor no próximo movimento do mouse.
 | --- | --- | --- |
 | Canhão | 30 | Dano alto, cadência lenta |
 | Rápida | 20 | Cadência alta, alcance curto |
-| Gelo | 25 | Dano baixo + slow |
+| Gelo | 25 | Dano baixo + slow (−40% por 1,8 s) |
+| Olho Laser | 45 | Feixe verde com dano direto e antecipação de squash/stretch antes do disparo |
 
 Inimigos: **Corredor** (rápido/frágil) e **Bruto** (lento/resistente).
 
@@ -47,16 +55,30 @@ Inimigos: **Corredor** (rápido/frágil) e **Bruto** (lento/resistente).
 | Pegar / interagir com a peça | Clique esquerdo |
 | Soltar e encaixar no tile | Clique esquerdo (press + release) |
 | Escolher torre | Clique na toolbar |
-| Ciclar torres | Scroll do mouse ou `1`/`2`/`3` |
+| Ciclar torres | Scroll do mouse ou `1`/`2`/`3`/`4` |
+| Girar o tabuleiro 90° (só em BUILD) | `Q` (esquerda) / `E` (direita), acumulando por toque |
 | Alternar FOLLOW_MOUSE / FIXED_ARM | `M` |
 | Cancelar / devolver torre | Clique direito, `Esc` ou clicar de novo no botão selecionado |
 | Iniciar onda | `Espaço` ou botão "Iniciar onda" |
-| Reiniciar após fim de jogo | `R` ou botão do overlay |
+| Reiniciar a fase | `R` (a qualquer momento) ou botão do overlay no fim de jogo |
 | +100 créditos (debug) | `F2` |
 
-Soltar em tile inválido (caminho, ocupado ou fora do tabuleiro) não solta a
-peça: a mão continua segurando. O **anel verde/vermelho** ao redor da peça
-mostra se o tile é válido — útil porque a mão cobre parte do tabuleiro.
+A mão segue o cursor por toda a tela (com `free_movement = true` no
+`HandPlayer`). Soltar em tile inválido **dentro do tabuleiro** (caminho ou
+ocupado) não solta a peça: a mão continua segurando. O **anel verde/vermelho**
+ao redor da peça mostra se o tile é válido — útil porque a mão cobre parte do
+tabuleiro.
+
+A peça é paga ao ser escolhida (CATCH). Soltar **fora dos limites do tabuleiro
++ margem de queda** (`drop_edge_margin`, 1,0 por padrão) derruba a peça com uma
+animação de queda; ela passa por trás do board, é removida e devolve 50% do
+valor (a outra metade é o desconto). Na faixa entre a borda e a margem a mão
+continua fechada. Cancelar a colocação devolve 100%.
+
+A toolbar tem **4 botões** (um por torre) com nome e custo; clicar de novo no
+botão selecionado cancela a colocação. O botão **Iniciar onda** fica
+desabilitado durante a onda e no fim de jogo, e o overlay final oferece
+**Jogar de novo `[R]`**.
 
 ## Como rodar
 
@@ -79,30 +101,36 @@ Pela linha de comando (Windows):
 ## Estrutura do projeto
 
 ```text
-scenes/ui/main_menu.tscn         tela inicial simples (Jogar / Sair)
+scenes/ui/main_menu.tscn         cena inicial simples (Jogar / Sair)
 scenes/main.tscn                 cena principal de gameplay
 scenes/hand_player.tscn          mão: PalmPivot, HoldPoint, GrabArea, ArmJelly
 scenes/ui/hud.tscn               top bar, toolbar e overlay de fim de jogo
 scripts/ui/main_menu.gd          montagem da tela inicial
-scripts/audio/audio_manager.gd   efeitos pontuais de combate e vitória
+scripts/audio/audio_manager.gd   autoload de efeitos pontuais de combate e vitória
 scripts/camera_iso.gd            câmera isométrica ortográfica
-scripts/board.gd                 grade, caminho, ocupação, mapa simples, highlight e range ring
+scripts/board.gd                 grade, caminho, ocupação, mapa, highlights, range ring e giro Q/E com bounce
 scripts/hand_controller.gd       mão: mouse, pose, CATCH, grab e release_guard
 scripts/build/build_controller.gd  toolbar <-> mão <-> board, créditos, encaixe
 scripts/game/game_manager.gd     estado, créditos, vidas, vitória/derrota
 scripts/enemies/                 Enemy e WaveManager
-scripts/towers/                  TowerPiece, Projectile e OcclusionOutline
+scripts/towers/                  TowerPiece, Projectile, OcclusionOutline e sync visual no giro
 scripts/ui/hud.gd                HUD/toolbar
 scripts/data/                    Resources de balanceamento
 resources/                       torres, inimigos e ondas (.tres)
 occlusion_outline.gdshader       outline 2D das máscaras mão/peça
+held_piece_dof.gdshader          desfoque de tela da peça segurada (profundidade do tile)
 assets/hand-game.glb             mão + CATCH/IDLE
 assets/oleos.glb                 modelo do Olho Laser (reutiliza o olho verde original)
 assets/maps/arena_prototipo.glb   mapa 3D de protótipo, com cores chapadas e sem texturas
 assets/maps/preview_arena_prototipo.png prévia superior do mapa
-tools/generate_map_assets.py      gerador do GLB/preview (Python + trimesh + numpy + matplotlib)
 assets/audio/sfx/               efeitos curtos de tiro, laser, morte e vitória
+tools/generate_map_assets.py      gerador do GLB/preview (Python + trimesh + numpy + matplotlib)
+tools/generate_audio_assets.py    gerador dos WAVs de efeito
+docs/                            notas de alterações, áudio/torre e correção do mapa cinza
 ```
+
+`project.godot` aponta `run/main_scene` para o menu e registra `AudioManager`
+na seção `[autoload]`. O botão JOGAR troca para `scenes/main.tscn`.
 
 As cenas de teste originais continuam em `scenes/`. O modelo `oleos.glb`, antes usado por `scenes/eye.tscn`, agora também é reutilizado como visual da torre especial Olho Laser.
 
@@ -119,11 +147,18 @@ As cenas de teste originais continuam em `scenes/`. O modelo `oleos.glb`, antes 
 | Giro da peça na mão | `held_yaw_degrees` (yaw efetivo = depth_yaw + held_yaw) |
 | Fade do antebraço | `forearm_fade_start` / `forearm_fade_strength` no `ArmJelly` |
 | Swing da peça carregada | `motion_*` no `TowerPiece` (Remote da peça segurada) |
+| Giro do tabuleiro | `rotation_step_degrees` / `rotation_duration` no `Board` |
 | Cor/espessura do outline | `outline_color` / `outline_size` no `OcclusionOutline` |
+| Desfoque da ponta superior (desligado) | `dof_blur_far_enabled`, `dof_blur_far_distance`, `dof_blur_far_transition`, `dof_blur_amount` no `CameraAttributesPractical` da `Camera3D` |
+| Desfoque da peça segurada (inativo com o DOF desligado) | `piece_blur_enabled` / `piece_blur_max_pixels` no `OcclusionOutline` |
+| Volume dos SFX / vozes | `sfx_volume` / `sfx_voice_count` no autoload `AudioManager` |
+| Antecipação do Olho Laser | `anticipation_enabled`, `anticipation_duration`, `anticipation_squash`, `anticipation_stretch` em `resources/towers/eye_laser.tres` |
 
 Os exports do `HandPlayer` e do `ArmJelly`/`OcclusionOutline` aplicam na hora
 (setters + `apply_pose`); o `pinch_offset` sobrescreve o Transform do HoldPoint
-na cena. O anel de validade acompanha o pé da peça.
+na cena. O anel de validade acompanha o pé da peça. No giro do tabuleiro, o
+visual das torres é sincronizado no mesmo passo do Tween (sem atraso) e o corpo
+físico é reposicionado na célula ao fim da animação.
 
 ## Pós-MVP
 
@@ -151,8 +186,15 @@ Distribuído sob a licença MIT. Veja [LICENSE](LICENSE) para mais detalhes.
 - A estrada é redesenhada em runtime pelo Godot com `BoxMesh` e materiais sem iluminação, acima do piso. Isso evita que a rota desapareça por incompatibilidade do importador GLB ou fique atrás dos tiles. Os inimigos recebem waypoints em Y=0.102, logo acima da estrada.
 - A rota tem três faixas horizontais conectadas nas laterais. As 35 células do GLB correspondem a `Board._default_path()`.
 - O menu contém somente HAND DEFENSE, JOGAR e SAIR. Sem subtítulo, controles, painel ou música.
-- Permanecem somente efeitos de tiro comum, laser, morte de inimigo e conclusão da fase.
+- A toolbar tem **4 botões** (Canhão, Rápida, Gelo e Olho Laser) com nome e custo; clicar de novo no botão selecionado cancela a colocação e o Iniciar onda fica desabilitado durante a onda e no fim de jogo.
+- O tabuleiro gira **90° por toque** de `Q`/`E` apenas em BUILD, com bounce; as torres acompanham o giro sem atraso e são encaixadas na célula ao fim da animação.
+- A câmera ortográfica tem um `CameraAttributesPractical` preparado para **desfoque de distância** (far blur), mas o efeito está **desligado** nesta build (`dof_blur_far_enabled` inativo): o tabuleiro fica nítido do início ao fim. O código do desfoque da peça segurada (`held_piece_dof.gdshader` + `OcclusionOutline`) permanece no projeto e volta a agir quando o far blur é religado. A **mão** usa `depth_draw_always` no shader do jelly para não ser desfocada junto com o fundo, e a HUD/outline nunca são afetados.
+- Permanecem somente efeitos de tiro comum, laser, morte de inimigo e conclusão da fase. As chaves de SFX são `shot_pew`, `laser`, `enemy_down` e `level_complete`.
 - O Olho Laser continua sendo a quarta torre e reutiliza `assets/oleos.glb`.
+- Antes de cada feixe, o Olho Laser faz uma antecipação de escala (squash e stretch) no modelo inteiro e só dispara depois dela. O recurso fica em `TowerData.anticipation_*` e está ativo no `eye_laser.tres`; o `frost.tres` também está habilitado para testes.
+- Se `anticipation_duration` for maior que `fire_interval`, a animação limita a cadência (`max(fire_interval, anticipation_duration)`); o tiro não é cancelado pelo wind-up seguinte.
+- `R` reinicia a fase em qualquer momento (BUILD, WAVE ou fim de jogo).
+- Se o mapa aparecer cinza após uma mudança, apague somente `.godot/imported` e reabra o projeto para forçar a reimportação. Não apague `assets/`.
 
 ## Testes necessários no Godot 4.7
 
@@ -160,6 +202,10 @@ Distribuído sob a licença MIT. Veja [LICENSE](LICENSE) para mais detalhes.
 2. Execute F5 e confirme que o menu apresenta apenas título, Jogar e Sair.
 3. Clique em Jogar e verifique se a estrada está acima dos tiles e se acompanha a rota dos inimigos.
 4. Coloque cada torre, incluindo o Olho Laser, e confirme o encaixe na grade.
-5. Inicie as ondas, confira os disparos e os sons de tiro/morte/vitória.
+5. Confirme que o Olho Laser faz squash/stretch antes do feixe e que as demais torres não deformam.
+6. Inicie as ondas, confira os disparos e os sons de tiro/morte/vitória.
+7. Pressione `R` em BUILD, durante uma onda e no fim de jogo para confirmar o restart.
+8. Pressione `Q`/`E` em BUILD e confirme o giro de 90° com bounce, as torres acompanhando sem atraso; confirme que não gira durante a onda.
+9. Confirme os 4 botões da toolbar (incluindo o Olho Laser), o custo ao posicionar e o Iniciar onda desabilitado durante a wave.
 
-**Limitação:** não foi possível executar o Godot neste ambiente. As verificações realizadas são estáticas; compilação e gameplay precisam ser confirmados no editor.
+**Limitação:** o projeto foi carregado no Godot 4.7 headless (scripts e cenas sem erros de parse/importação), mas o gameplay visual e a reprodução dos WAVs precisam ser confirmados no editor.

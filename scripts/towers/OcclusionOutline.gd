@@ -14,10 +14,16 @@ extends Node
 ## O shader original é canvas_item; ele é aplicado num ColorRect restrito ao
 ## retângulo de tela da peça (performance) e amostra as duas máscaras em
 ## coordenadas de tela (SCREEN_UV).
+##
+## Além do outline, o mesmo mask da peça alimenta um blur de tela: a peça
+## segurada fica na profundidade da mão (nítida no DOF), mas pertence ao
+## tabuleiro. O raio do blur vem da profundidade da célula alvo, então a peça
+## desfoca junto com o tile sob ela — e a mão continua fora do efeito.
 
 const HAND_LAYER := 1 << 4
 const PIECE_LAYER := 1 << 5
 const OUTLINE_SHADER := preload("res://occlusion_outline.gdshader")
+const BLUR_SHADER := preload("res://held_piece_dof.gdshader")
 
 @export var hand_path: NodePath
 @export var outline_color := Color(1.0, 0.6, 0.0, 1.0):
@@ -31,6 +37,9 @@ const OUTLINE_SHADER := preload("res://occlusion_outline.gdshader")
 		if _outline_material != null:
 			_outline_material.set_shader_parameter("outline_size", value)
 @export_range(0.25, 1.0, 0.05) var mask_resolution_scale := 1.0
+@export var piece_blur_enabled := true
+## Raio máximo do blur da peça em pixels a 720p (escala junto com o viewport).
+@export_range(0.0, 24.0, 0.5) var piece_blur_max_pixels := 10.0
 
 var _hand: HandController
 var _camera: Camera3D
@@ -42,6 +51,8 @@ var _piece_mask_camera: Camera3D
 var _outline_layer: CanvasLayer
 var _outline_rect: ColorRect
 var _outline_material: ShaderMaterial
+var _blur_rect: ColorRect
+var _blur_material: ShaderMaterial
 var _active_piece: TowerPiece
 var _saved_layers := {}
 
@@ -74,6 +85,7 @@ func _process(_delta: float) -> void:
 		if held != _active_piece:
 			_activate(held)
 		_update_outline_rect(held)
+		_update_blur_rect(held)
 	elif _active_piece != null:
 		_deactivate()
 
@@ -168,6 +180,19 @@ func _setup_outline() -> void:
 	_outline_layer.layer = 0
 	add_child(_outline_layer)
 
+	# O blur é criado antes do outline para ficar por baixo do contorno.
+	_blur_rect = ColorRect.new()
+	_blur_rect.name = "PieceBlurRect"
+	_blur_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_blur_rect.color = Color(1.0, 1.0, 1.0, 1.0)
+	_blur_rect.visible = false
+	_outline_layer.add_child(_blur_rect)
+
+	_blur_material = ShaderMaterial.new()
+	_blur_material.shader = BLUR_SHADER
+	_blur_material.set_shader_parameter("piece_mask", _piece_mask_viewport.get_texture())
+	_blur_rect.material = _blur_material
+
 	_outline_rect = ColorRect.new()
 	_outline_rect.name = "OutlineRect"
 	_outline_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -201,6 +226,7 @@ func _activate(piece: TowerPiece) -> void:
 	_piece_mask_viewport.render_target_update_mode = SubViewport.UPDATE_ALWAYS
 	_outline_rect.visible = true
 	_update_outline_rect(piece)
+	_update_blur_rect(piece)
 
 
 func _deactivate() -> void:
@@ -216,6 +242,8 @@ func _deactivate() -> void:
 		_piece_mask_viewport.render_target_update_mode = SubViewport.UPDATE_DISABLED
 	if _outline_rect != null:
 		_outline_rect.visible = false
+	if _blur_rect != null:
+		_blur_rect.visible = false
 
 
 func _update_outline_rect(piece: TowerPiece) -> void:
@@ -233,3 +261,58 @@ func _update_outline_rect(piece: TowerPiece) -> void:
 	var rect_half := 1.15 * pixels_per_unit + float(outline_size) + 8.0
 	_outline_rect.position = screen_center - Vector2(rect_half, rect_half)
 	_outline_rect.size = Vector2(rect_half * 2.0, rect_half * 2.0)
+
+
+## Raio do blur da peça em pixels de tela. Usa a profundidade da célula alvo
+## (o pé da peça) e a mesma rampa do DOF da câmera, então a peça desfoca
+## exatamente quando o tile sob ela desfoca.
+func _blur_radius_pixels() -> float:
+	if not piece_blur_enabled or _camera == null or _hand == null or _main_viewport == null:
+		return 0.0
+
+	var attributes := _camera.attributes as CameraAttributesPractical
+	if attributes == null or not attributes.dof_blur_far_enabled:
+		return 0.0
+
+	var target := _hand.get_target_position()
+	var view_position := _camera.global_transform.affine_inverse() * target
+	var depth := -view_position.z
+
+	var far_distance := attributes.dof_blur_far_distance
+	var transition := maxf(attributes.dof_blur_far_transition, 0.001)
+	var ratio := clampf((depth - far_distance) / transition, 0.0, 1.0)
+	if ratio <= 0.0:
+		return 0.0
+
+	# O amount do DOF é normalizado; calibramos o raio em pixels pela altura
+	# real do render target (o stretch pode diferir do visible_rect).
+	var amount_scale := attributes.dof_blur_amount / 0.1
+	var render_height := float(_main_viewport.get_texture().get_size().y)
+	if render_height <= 0.0:
+		render_height = 720.0
+	return ratio * piece_blur_max_pixels * amount_scale * (render_height / 720.0)
+
+
+func _update_blur_rect(piece: TowerPiece) -> void:
+	if _camera == null or _blur_rect == null or _blur_material == null:
+		return
+
+	var radius := _blur_radius_pixels()
+	if radius < 0.5:
+		_blur_rect.visible = false
+		return
+
+	var viewport_size := _main_viewport.get_visible_rect().size
+	var center := piece.global_position + Vector3.UP * 0.5
+	var screen_center := _camera.unproject_position(center)
+
+	var pixels_per_unit := 70.0
+	if _camera.projection == Camera3D.PROJECTION_ORTHOGONAL and _camera.size > 0.001:
+		pixels_per_unit = viewport_size.y / _camera.size
+
+	var margin := piece_blur_max_pixels * (viewport_size.y / 720.0) + 10.0
+	var rect_half := 1.15 * pixels_per_unit + margin
+	_blur_rect.position = screen_center - Vector2(rect_half, rect_half)
+	_blur_rect.size = Vector2(rect_half * 2.0, rect_half * 2.0)
+	_blur_material.set_shader_parameter("blur_radius_px", radius)
+	_blur_rect.visible = true

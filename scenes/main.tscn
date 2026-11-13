@@ -16,10 +16,9 @@ ambient_light_source = 2
 ambient_light_color = Color(0.55, 0.62, 0.78, 1)
 ambient_light_energy = 0.45
 
-[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_h2yge"]
-albedo_color = Color(0.055, 0.105, 0.135, 1)
-
-[sub_resource type="PlaneMesh" id="PlaneMesh_0duit"]
+[sub_resource type="CameraAttributesPractical" id="CameraAttributes_main"]
+dof_blur_far_distance = 31.0
+dof_blur_near_distance = 0.09
 
 [node name="Main" type="Node3D" unique_id=1285220481]
 
@@ -40,25 +39,21 @@ spot_attenuation = 1.5
 spot_angle = 55.0
 
 [node name="FillLight" type="OmniLight3D" parent="." unique_id=8430198]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.8, 4, -3.4)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -17.264385, 4, 4.7419486)
 light_color = Color(0.5, 0.65, 1, 1)
 light_energy = 2.0
-omni_range = 16.0
+omni_range = 20.50767
 
 [node name="Camera3D" type="Camera3D" parent="." unique_id=188869187]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 4.494298)
+attributes = SubResource("CameraAttributes_main")
 script = ExtResource("1_camera")
-
-[node name="BG" type="MeshInstance3D" parent="." unique_id=1769729400]
-transform = Transform3D(18.0, 0, 0, 0, 1, 0, 0, 0, 18.0, 0, -2.5299003, 0)
-material_override = SubResource("StandardMaterial3D_h2yge")
-mesh = SubResource("PlaneMesh_0duit")
 
 [node name="Board" type="Node3D" parent="." unique_id=2141213763]
 unique_name_in_owner = true
 script = ExtResource("2_board")
 
-[node name="Towers" type="Node3D" parent="." unique_id=791574189]
+[node name="Towers" type="Node3D" parent="Board" unique_id=791574189]
 unique_name_in_owner = true
 
 [node name="Enemies" type="Node3D" parent="." unique_id=2140369195]
@@ -70,8 +65,8 @@ unique_name_in_owner = true
 [node name="HandPlayer" parent="." unique_id=976161558 instance=ExtResource("3_hand")]
 unique_name_in_owner = true
 board_path = NodePath("../Board")
-hand_plane_distance = 4.0
-pinch_offset = Vector3(0.2, 0.3, -0.8)
+pinch_offset = Vector3(0, 0.6, -0.8)
+hide_cursor = false
 
 [node name="HUD" parent="." unique_id=1761375032 instance=ExtResource("4_hud")]
 unique_name_in_owner = true

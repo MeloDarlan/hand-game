@@ -1,8 +1,7 @@
 extends Camera3D
 class_name IsoCamera
 
-## Câmera isométrica ortográfica. Configurada por código para manter a
-## matemática num lugar só (yaw, pitch, distância e alvo).
+## Câmera isométrica ortográfica.
 
 @export var yaw_degrees := 45.0
 @export var pitch_degrees := 35.264

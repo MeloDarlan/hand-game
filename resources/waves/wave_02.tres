@@ -1,7 +1,7 @@
-[gd_resource type="Resource" script_class="WaveData" load_steps=7 format=3]
+[gd_resource type="Resource" script_class="WaveData" format=3 uid="uid://brrh1ras7kdyb"]
 
-[ext_resource type="Script" path="res://scripts/data/wave_data.gd" id="1_wave"]
-[ext_resource type="Script" path="res://scripts/data/wave_group.gd" id="2_group"]
+[ext_resource type="Script" uid="uid://cmncimsemnmq" path="res://scripts/data/wave_data.gd" id="1_wave"]
+[ext_resource type="Script" uid="uid://c32bal05xd65" path="res://scripts/data/wave_group.gd" id="2_group"]
 [ext_resource type="Resource" path="res://resources/enemies/runner.tres" id="3_runner"]
 [ext_resource type="Resource" path="res://resources/enemies/brute.tres" id="4_brute"]
 
@@ -10,7 +10,6 @@ script = ExtResource("2_group")
 enemy_data = ExtResource("3_runner")
 count = 10
 spawn_interval = 0.8
-start_delay = 0.0
 
 [sub_resource type="Resource" id="WaveGroup_2"]
 script = ExtResource("2_group")

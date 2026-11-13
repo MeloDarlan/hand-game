@@ -13,7 +13,7 @@ script = ExtResource("1_hand")
 [node name="PalmPivot" type="Node3D" parent="." unique_id=1510662433]
 
 [node name="Model" parent="PalmPivot" unique_id=1763835175 instance=ExtResource("2_model")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -1, 0)
+transform = Transform3D(-0.9396926, 0, -0.34202015, 0, 1, 0, 0.34202015, 0, -0.9396926, 0, -1, 0)
 
 [node name="HoldPoint" type="Marker3D" parent="PalmPivot" unique_id=718151841]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.2, 0.55)
