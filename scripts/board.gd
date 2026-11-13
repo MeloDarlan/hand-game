@@ -538,6 +538,16 @@ func clamp_world_position(world: Vector3, margin: float) -> Vector3:
 	return to_global(local)
 
 
+## True quando o ponto está além da borda externa da grade + margin. É o
+## limiar de queda: dentro dessa faixa a peça continua na mão, para não cair
+## visualmente em cima do tabuleiro.
+func is_beyond_drop_margin(world: Vector3, margin: float) -> bool:
+	var limit_x := grid_size.x * tile_size * 0.5 + margin
+	var limit_z := grid_size.y * tile_size * 0.5 + margin
+	var local := to_local(world)
+	return absf(local.x) > limit_x or absf(local.z) > limit_z
+
+
 func show_highlight(cell: Vector2i, valid: bool) -> void:
 	if not is_in_bounds(cell):
 		hide_highlight()

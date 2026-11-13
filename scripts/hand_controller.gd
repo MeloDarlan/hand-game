@@ -19,6 +19,9 @@ enum MovementMode { FOLLOW_MOUSE, FIXED_ARM }
 @export var board_path: NodePath
 ## Folga além das bordas do tabuleiro que o alvo ainda alcança.
 @export var board_margin := 0.8
+## Se true, a mão segue o cursor por toda a tela, sem limitar a posição ao
+## tabuleiro. Se false, usa board_margin para prender a mão ao redor da grade.
+@export var free_movement := true
 ## Distância, em unidades, do plano da mão à frente do centro do tabuleiro.
 @export var hand_plane_distance := 8.0
 ## Escala aplicada ao PalmPivot (mão maior = braço mais longo e corte oculto).
@@ -325,7 +328,13 @@ func _cursor_board_point() -> Vector3:
 		return Vector3.ZERO
 
 	var point: Vector3 = hit
-	if _board != null:
+	return _project_to_board_plane(point)
+
+
+## Aplica o clamp ao redor do tabuleiro apenas no modo restrito. Com a mão
+## livre, o cursor pode sair da grade e o alvo vira uma célula inválida.
+func _project_to_board_plane(point: Vector3) -> Vector3:
+	if _board != null and not free_movement:
 		point = _board.clamp_world_position(point, board_margin)
 	point.y = 0.0
 	return point
@@ -372,10 +381,7 @@ func get_target_position() -> Vector3:
 		return Vector3.ZERO
 
 	var point: Vector3 = hit
-	if _board != null:
-		point = _board.clamp_world_position(point, board_margin)
-	point.y = 0.0
-	return point
+	return _project_to_board_plane(point)
 
 
 func get_hold_position() -> Vector3:
@@ -397,10 +403,7 @@ func get_grab_region_position() -> Vector3:
 		return get_target_position()
 
 	var point: Vector3 = hit
-	if _board != null:
-		point = _board.clamp_world_position(point, board_margin)
-	point.y = 0.0
-	return point
+	return _project_to_board_plane(point)
 
 
 ## Raio efetivo do GrabArea no mundo (a esfera é escalada pelo PalmPivot).

@@ -57,6 +57,11 @@ func setup_towers(tower_defs: Array) -> void:
 func set_selected(index: int) -> void:
 	for i in _buttons.size():
 		_buttons[i].set_pressed_no_signal(i == index)
+		var tower := _tower_defs[i] as TowerData
+		if tower != null:
+			# O botão selecionado continua clicável mesmo que os créditos
+			# restantes sejam menores que o custo (a peça já foi paga no CATCH).
+			_buttons[i].disabled = i != index and tower.cost > _credits
 
 
 func set_credits(value: int) -> void:
@@ -65,7 +70,9 @@ func set_credits(value: int) -> void:
 	for i in _buttons.size():
 		var tower := _tower_defs[i] as TowerData
 		if tower != null:
-			_buttons[i].disabled = tower.cost > value
+			# A peça selecionada já foi paga no CATCH: mantém o botão clicável
+			# para o jogador poder desmarcar e cancelar a colocação.
+			_buttons[i].disabled = tower.cost > value and not _buttons[i].button_pressed
 
 
 func set_lives(value: int) -> void:

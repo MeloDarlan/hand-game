@@ -13,11 +13,19 @@ const DEFAULT_TOWER_PATHS := [
 const INVALID_CELL := Vector2i(-999, -999)
 
 @export var tower_types: Array = []
+## Fração do valor DEVOLVIDA quando a peça é solta fora do tabuleiro.
+## 0.5 = devolve metade (a outra metade é o desconto da queda).
+@export_range(0.0, 1.0, 0.05) var drop_refund_ratio := 0.5
+## Distância (unidades de mundo) além da borda externa do board exigida para
+## soltar e derrubar a peça. Dentro dessa faixa a mão continua segurando.
+@export var drop_edge_margin := 1.0
 
 var selected_index := -1
 
 var _held: TowerPiece
 var _origin_cell := INVALID_CELL
+## Créditos já pagos pela peça em mão no CATCH (0 para torre em movimento).
+var _paid_cost := 0
 var _hover_cell := INVALID_CELL
 var _hover_valid := false
 var _release_cell := INVALID_CELL
@@ -157,6 +165,14 @@ func _spawn_piece() -> void:
 		_hud.set_selected(-1)
 		return
 
+	# A peça é paga no CATCH. O encaixe não cobra de novo; cancelar devolve
+	# 100% e cair fora do tabuleiro devolve drop_refund_ratio.
+	if not _game.spend(tower.cost):
+		selected_index = -1
+		_hud.set_selected(-1)
+		return
+	_paid_cost = tower.cost
+
 	var piece := TowerPiece.new()
 	piece.setup(tower)
 	_towers.add_child(piece)
@@ -173,9 +189,15 @@ func _can_release_held() -> bool:
 	# Chamada ANTES do release, quando o HandController ainda tem a peça.
 	# Guardamos a célula porque no release o _held da mão já foi limpo e o
 	# HoldPoint passa a ser a pinça no topo, não a base.
-	var cell := _board.world_to_cell(_hand.get_target_position())
+	var target := _hand.get_target_position()
+	var cell := _board.world_to_cell(target)
 	_release_cell = cell
-	return _board.is_buildable(cell)
+	if _board.is_in_bounds(cell):
+		return _board.is_buildable(cell)
+	# Fora da grade: ainda exige passar da borda + drop_edge_margin. Assim a
+	# peça não inicia a queda visualmente em cima do tabuleiro; dentro da faixa
+	# a mão continua fechada (como num tile inválido).
+	return _board.is_beyond_drop_margin(target, drop_edge_margin)
 
 
 func _pick_tower_at_hand() -> Grabbable:
@@ -246,6 +268,7 @@ func _on_grab_started(body: Grabbable) -> void:
 
 	_held = piece
 	_origin_cell = piece.cell
+	_paid_cost = 0
 	_board.unregister_tower(piece.cell)
 	piece.is_placed = false
 	_hover_cell = INVALID_CELL
@@ -261,6 +284,9 @@ func _on_grab_released(body: Grabbable, _velocity: Vector3) -> void:
 	# Célula guardada pelo release_guard (antes do HandController limpar _held).
 	var cell := _release_cell
 	_release_cell = INVALID_CELL
+	if not _board.is_in_bounds(cell):
+		_drop_held_outside()
+		return
 	if not _board.is_buildable(cell):
 		_return_held()
 		return
@@ -273,16 +299,13 @@ func _place_held(cell: Vector2i) -> void:
 	if piece == null:
 		return
 
-	var is_move := _origin_cell != INVALID_CELL
-	if not is_move and not _game.spend(piece.data.cost):
-		_return_held()
-		return
-
+	# Peça nova já foi paga no CATCH; mover uma torre é grátis.
 	piece.place(cell, _board.cell_to_world(cell))
 	_board.register_tower(cell, piece)
 
 	_held = null
 	_origin_cell = INVALID_CELL
+	_paid_cost = 0
 	_hand.release_guard = Callable()
 	_stop_preview()
 
@@ -302,11 +325,49 @@ func _return_held() -> void:
 		piece.place(_origin_cell, _board.cell_to_world(_origin_cell))
 		_board.register_tower(_origin_cell, piece)
 	else:
+		_refund_paid_cost(1.0)
 		piece.queue_free()
 
 	_origin_cell = INVALID_CELL
 	_hand.release_guard = Callable()
 	_stop_preview()
+
+
+## Soltou fora dos limites do tabuleiro: a peça cai da mão, sai do jogo e
+## devolve apenas drop_refund_ratio do valor (estorno parcial).
+func _drop_held_outside() -> void:
+	var piece := _held
+	if piece == null:
+		return
+	_held = null
+
+	# Em produção a mão já soltou antes de emitir grab_released; isso cobre
+	# chamadas programáticas/forçadas e evita referência a peça liberada.
+	if _hand.get_held_body() == piece:
+		_hand.cancel_grab()
+
+	_origin_cell = INVALID_CELL
+	_hand.release_guard = Callable()
+	_stop_preview()
+	selected_index = -1
+	_hud.set_selected(-1)
+
+	var cost := _paid_cost
+	if piece.data != null:
+		cost = piece.data.cost
+	var refund := roundi(float(cost) * (1.0 - clampf(drop_refund_ratio, 0.0, 1.0)))
+	_paid_cost = 0
+
+	piece.play_drop_off_board()
+	if refund > 0:
+		_game.add_credits(refund)
+
+
+func _refund_paid_cost(ratio: float) -> void:
+	var amount := roundi(float(_paid_cost) * clampf(ratio, 0.0, 1.0))
+	_paid_cost = 0
+	if amount > 0:
+		_game.add_credits(amount)
 
 
 func _cancel_current() -> void:
@@ -322,6 +383,8 @@ func _cancel_current() -> void:
 		piece.place(_origin_cell, _board.cell_to_world(_origin_cell))
 		_board.register_tower(_origin_cell, piece)
 	else:
+		# Cancelar/trocar a peça é intencional: devolve o valor integral.
+		_refund_paid_cost(1.0)
 		piece.queue_free()
 
 	_origin_cell = INVALID_CELL

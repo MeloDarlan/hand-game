@@ -1,4 +1,5 @@
 shader_type spatial;
+render_mode depth_draw_always;
 
 // Deformação tipo jelly apenas no antebraço.
 // O VERTEX no Godot 4 já chega com a skinning aplicada; BONE_INDICES/WEIGHTS

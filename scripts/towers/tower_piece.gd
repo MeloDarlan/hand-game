@@ -1,10 +1,6 @@
 extends Grabbable
 class_name TowerPiece
 
-## Peça de torre: é um Grabbable físico, então a mão pode carregar, reposicionar
-## e "soltar" usando exatamente as mecânicas já existentes.
-## Visual construído com primitivas a partir de TowerData (tema provisório).
-
 const PROJECTILE_GROUP := "projectiles"
 const INVALID_CELL := Vector2i(-999, -999)
 
@@ -12,17 +8,19 @@ var data: TowerData
 var is_placed := false
 var cell := INVALID_CELL
 
-## Distância da base da peça até o ponto onde a mão pinça o topo.
-## Copiado de TowerData no setup; o export permite tuning no Remote.
 @export var grip_height := 0.9
 
 @export_group("Held Motion")
 @export var motion_enabled := true
 @export var motion_stiffness := 90.0
 @export var motion_damping := 5
-## Radianos de inclinação por unidade/s de velocidade da mão.
 @export var motion_velocity_gain := 0.03
 @export_range(0.0, 45.0) var motion_max_tilt_degrees := 20.0
+
+@export_group("Drop")
+## Distância que o visual da peça é afastado da câmera ao cair, para passar por
+## trás do board. A câmera é ortográfica, então isso não desloca a peça na tela.
+@export var drop_depth_offset := 16.0
 
 var _head: Node3D
 var _barrel_tip: Marker3D
@@ -36,9 +34,16 @@ var _swing_velocity := Vector2.ZERO
 var _prev_anchor := Vector3.ZERO
 var _motion_initialized := false
 
+var _drop_start_position := Vector3.ZERO
+var _drop_start_basis := Basis.IDENTITY
+var _drop_start_scale := Vector3.ONE
+var _drop_down := Vector3.DOWN
+var _drop_spin_axis := Vector3.BACK
+var _drop_spin := 0.0
+var _drop_distance := 0.0
+var _drop_away := Vector3.FORWARD
 
 func _ready() -> void:
-	# A torre fica na layer grabbable para a mão poder pegá-la de volta.
 	collision_layer = 2
 	collision_mask = 0
 	apply_color_override = false
@@ -73,6 +78,84 @@ func reset_visual_transform() -> void:
 		return
 	_squash_pivot.position = Vector3.ZERO
 	_squash_pivot.rotation = Vector3.ZERO
+
+
+## Soltou a peça fora do tabuleiro: ela escapa da mão, cai atrás do board
+## (afastando-se da câmera), gira, encolhe/apaga e é removida.
+## Só o visual (SquashPivot) se move; o corpo congelado é liberado no fim.
+func play_drop_off_board(duration := 0.7, fall_distance := 7.0, spin_degrees := 540.0) -> void:
+	is_placed = false
+	cell = INVALID_CELL
+	_cancel_anticipation()
+	_swing = Vector2.ZERO
+	_swing_velocity = Vector2.ZERO
+	_motion_initialized = false
+
+	# Sai do pick/combate e não colide mais com nada.
+	collision_layer = 0
+	collision_mask = 0
+	freeze = true
+	sleeping = false
+	linear_velocity = Vector3.ZERO
+	angular_velocity = Vector3.ZERO
+
+	reset_visual_transform()
+	if _squash_pivot == null:
+		queue_free()
+		return
+
+	var camera := get_viewport().get_camera_3d()
+	_drop_down = Vector3.DOWN
+	_drop_spin_axis = Vector3.BACK
+	_drop_away = Vector3.FORWARD
+	if camera != null:
+		_drop_down = -camera.global_transform.basis.y.normalized()
+		_drop_spin_axis = camera.global_transform.basis.z.normalized()
+		# Câmera olha para -Z local; afastar-se dela é seguir o -basis.z.
+		_drop_away = -camera.global_transform.basis.z.normalized()
+
+	# A câmera é ortográfica: afastar no eixo da câmera não muda a posição em
+	# tela, só garante que a peça passe por trás do board.
+	_drop_start_position = (
+		_squash_pivot.global_position
+		+ _drop_away * maxf(drop_depth_offset, 0.0)
+	)
+	_drop_start_basis = _squash_pivot.global_transform.basis
+	_drop_start_scale = _squash_pivot.scale
+	_drop_distance = maxf(fall_distance, 0.1)
+	_drop_spin = deg_to_rad(spin_degrees)
+
+	var tween := create_tween()
+	tween.set_parallel(true)
+	tween.tween_method(_apply_drop_fall, 0.0, 1.0, duration)
+	tween.tween_method(_apply_drop_scale, 0.0, 1.0, duration)
+	tween.tween_method(_apply_drop_fade, 0.0, 1.0, duration * 0.55).set_delay(duration * 0.45)
+	tween.chain().tween_callback(queue_free)
+
+
+func _apply_drop_fall(progress: float) -> void:
+	if not is_instance_valid(_squash_pivot):
+		return
+	# progress² dá aceleração de queda (começa devagar e despenca).
+	var position := _drop_start_position + _drop_down * _drop_distance * progress * progress
+	var basis := Basis(_drop_spin_axis, _drop_spin * progress) * _drop_start_basis
+	_squash_pivot.global_transform = Transform3D(basis, position)
+
+
+func _apply_drop_scale(progress: float) -> void:
+	if not is_instance_valid(_squash_pivot):
+		return
+	_squash_pivot.scale = _drop_start_scale.lerp(Vector3.ONE * 0.3, progress)
+
+
+func _apply_drop_fade(progress: float) -> void:
+	# Fade por instância; o encolhimento é o fallback caso o renderer ignore a
+	# transparência de materiais opacos.
+	var value := clampf(progress, 0.0, 1.0)
+	for node in find_children("*", "GeometryInstance3D", true, false):
+		var geometry := node as GeometryInstance3D
+		if geometry != null:
+			geometry.transparency = value
 
 
 func _apply_hold_pose() -> void:
